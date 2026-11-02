@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { Modal } from "@/components/modal";
 import Link from "next/link";
 import { moveLeadStage, changeLeadStage } from "@/app/(workspace)/leads/actions";
 
@@ -39,7 +40,7 @@ function Board({ board }: { board: PipelineBoard }) {
   };
 
   return (
-    <section className="ui-card p-4 md:p-5">
+    <section className="min-w-0">
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <h2 className="font-semibold text-neutral-900">{board.organisationName}</h2>
         <span className="text-xs text-neutral-500">{board.leads.length} leads</span>
@@ -49,8 +50,8 @@ function Board({ board }: { board: PipelineBoard }) {
         {board.stages.map((stage) => {
           const leads = board.leads.filter((l) => l.stageId === stage.id);
           return (
-            <div key={stage.id} onDragOver={(e) => e.preventDefault()} onDrop={drop(stage.id)} className="w-60 shrink-0 rounded-lg border border-neutral-200 bg-neutral-50/60">
-              <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5">
+            <div key={stage.id} onDragOver={(e) => e.preventDefault()} onDrop={drop(stage.id)} className="w-64 shrink-0 rounded-lg bg-neutral-50">
+              <div className="flex items-center justify-between px-3 py-3">
                 <span className="text-sm font-medium text-neutral-800">{stage.name}</span>
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs text-neutral-500">{leads.length}</span>
               </div>
@@ -67,13 +68,13 @@ function Board({ board }: { board: PipelineBoard }) {
                       <p className="text-sm font-medium text-neutral-900">{lead.title}</p>
                       <p className="mt-0.5 text-xs text-neutral-500">{lead.companyName}</p>
                     </Link>
-                    <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+                    <div className="px-3 pb-1"><Modal title={lead.title} description={lead.companyName} trigger="Quick view" triggerClassName="text-[11px] text-neutral-400 hover:text-neutral-800"><dl className="mb-6 grid grid-cols-2 gap-5 text-sm"><div><dt className="mb-1 text-xs text-neutral-400">Stage</dt><dd>{stage.name}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Owner</dt><dd>{lead.owner}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Estimated value</dt><dd>{lead.value ? `$${lead.value}` : "Not set"}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Organisation / project</dt><dd>{board.organisationName}</dd></div></dl><Link href={`/leads/${lead.id}`} className="ui-button w-full">Open lead details →</Link></Modal></div><div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
                       {lead.value ? <span className="text-xs font-medium text-neutral-700">${lead.value}</span> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
                       {lead.editable ? <form action={changeLeadStage} className="shrink-0"><input type="hidden" name="id" value={lead.id} /><select name="stageId" defaultValue={lead.stageId} onChange={(e) => e.currentTarget.form?.requestSubmit()} aria-label={`Move ${lead.title}`} className="rounded border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-700 outline-none hover:border-neutral-300">{board.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></form> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
                     </div>
                   </div>
                 ))}
-                {!leads.length && <p className="rounded-md border border-dashed border-neutral-200 px-3 py-6 text-center text-xs text-neutral-400">Drop leads here</p>}
+                {!leads.length && <p className="rounded-md border border-dashed border-neutral-200 px-3 py-6 text-center text-xs text-neutral-400">No leads in this stage</p>}
               </div>
             </div>
           );

@@ -1,3 +1,6 @@
+import { WorkspaceGate } from "@/components/workspace-gate";
+import { Modal } from "@/components/modal";
+import { ArrowUpRight, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -7,10 +10,7 @@ import { STATUS_LABELS, STATUS_STYLES, type ProjectStatus } from "@/lib/project-
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const user = await currentUser(); const params = await searchParams;
-  if (!user) {
-    const organisations = await db.organisation.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
-    return <div className="space-y-8"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-violet-600">Spiritus × Velocity Workspace</p><h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Projects</h1><p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">Plan and track the work that ships.</p></div><section className="ui-card p-6 md:p-8"><h2 className="text-lg font-semibold tracking-tight">Workspace setup is in progress</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">Projects stay private while team access is being set up.</p></section><div className="grid gap-3">{organisations.map((org) => <div key={org.id} className="ui-card px-5 py-4 text-sm font-medium text-neutral-700">{org.name}</div>)}</div></div>;
-  }
+  if (!user) return <WorkspaceGate title="Projects" />;
 
   const q = (params.q ?? "").slice(0, 100);
   const where = { AND: [await projectScope(user.id), q ? { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { description: { contains: q, mode: "insensitive" as const } }] } : {}] };
@@ -22,20 +22,23 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   return <div className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><p className="text-sm text-violet-700">Workspace</p><h1 className="text-3xl font-semibold mt-1">Projects</h1><p className="text-neutral-500 mt-2">{projects.length} projects</p></div>
+      <div><h1 className="text-xl font-semibold tracking-tight">Projects <span className="ml-2 text-sm font-normal text-neutral-400">{projects.length}</span></h1><p className="mt-1 text-sm text-neutral-500">A clear view of the work moving forward.</p></div>
       <div className="flex items-center gap-2"><form><input name="q" defaultValue={q} placeholder="Search projects" aria-label="Search projects"/></form>{creatableOrgs.length > 0 && <NewProjectButton organisations={creatableOrgs} />}</div>
     </div>
-    {projects.length > 0 ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{projects.map((project) => {
+    <div className="flex items-center gap-2 border-y py-3 text-xs text-neutral-500"><FolderKanban size={14}/> All projects <span className="ml-auto">Select a project to explore its pipeline</span></div>
+    {projects.length > 0 ? <div className="divide-y rounded-lg border">{projects.map((project) => {
       const status = project.status as ProjectStatus;
-      return <Link key={project.id} href={`/projects/${project.id}`} className="ui-card group p-5 transition-shadow hover:shadow-md">
-        <div className="flex items-start justify-between">
-          <span className="grid size-10 place-items-center rounded-lg bg-violet-50 text-lg">{project.emoji || project.name.slice(0, 1).toUpperCase()}</span>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}>{STATUS_LABELS[status]}</span>
-        </div>
-        <h2 className="mt-3 font-semibold text-neutral-900 group-hover:text-violet-700">{project.name}</h2>
-        <p className="mt-1 line-clamp-2 text-sm text-neutral-500">{project.description || "No description yet."}</p>
-        <div className="mt-4 flex items-center justify-between text-xs text-neutral-400"><span>{project._count.leads} leads</span><span>{project.organisation.name} · {project.updatedAt.toLocaleDateString()}</span></div>
-      </Link>;
-    })}</div> : <div className="ui-card p-12 text-center"><p className="font-medium text-neutral-700">No projects yet</p><p className="mt-1 text-sm text-neutral-500">Create your first project to start tracking work.</p></div>}
+      return <div key={project.id} className="group flex flex-wrap items-center gap-4 p-4 transition-colors hover:bg-neutral-50">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-neutral-50 text-sm">{project.emoji || project.name.slice(0, 1).toUpperCase()}</span>
+        <Link href={`/projects/${project.id}`} className="min-w-0 flex-1"><h2 className="text-sm font-medium text-neutral-900">{project.name}</h2><p className="mt-0.5 line-clamp-1 text-xs text-neutral-500">{project.description || project.organisation.name}</p></Link>
+        <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${STATUS_STYLES[status]}`}>{STATUS_LABELS[status]}</span>
+        <span className="hidden text-xs text-neutral-400 lg:block">{project._count.leads} leads</span>
+        <Modal title={project.name} description={project.organisation.name} trigger="Quick view" triggerClassName="rounded-md px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
+          <p className="mb-6 whitespace-pre-wrap text-sm leading-6 text-neutral-600">{project.description || "No description yet."}</p>
+          <dl className="mb-6 grid grid-cols-2 gap-5 text-sm"><div><dt className="mb-1 text-xs text-neutral-400">Status</dt><dd>{STATUS_LABELS[status]}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Owner</dt><dd>{project.owner.name}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Linked leads</dt><dd>{project._count.leads}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Updated</dt><dd>{project.updatedAt.toLocaleDateString()}</dd></div></dl>
+          <Link href={`/projects/${project.id}`} className="ui-button w-full">Open project <ArrowUpRight size={14}/></Link>
+        </Modal>
+      </div>;
+    })}</div> : <div className="rounded-lg border border-dashed py-16 text-center"><FolderKanban size={24} className="mx-auto mb-3 text-neutral-300"/><p className="text-sm font-medium">{q ? "No projects match your search" : "Your next project starts here"}</p><p className="mt-1 text-sm text-neutral-500">{q ? "Try a different name or description." : "Group related leads and track their progress together."}</p></div>}
   </div>;
 }

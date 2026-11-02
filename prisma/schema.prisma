@@ -221,3 +221,15 @@ model Project {
   @@index([organisationId, deletedAt, updatedAt])
   @@index([ownerId, deletedAt])
 }
+
+model AiConfiguration {
+  id String @id
+  encryptedKey String?
+  model String @default("deepseek-chat")
+  enabled Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+model AiRateLimit {
+  userId String @id
+  lastRequestedAt DateTime
+}

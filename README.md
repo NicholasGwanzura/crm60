@@ -50,3 +50,13 @@ The application and a private PostgreSQL service are deployed in the Dokploy pro
 The live health check is `https://spiritus.click/api/health`. Configure database backups in Dokploy before storing durable business data.
 
 Remaining gaps before full production use: email delivery for invitations (links are currently shared manually), email verification, rate limiting, audit logs, secure document storage, and integration tests. Do not enter real customer data until those controls are implemented and reviewed.
+
+## DeepSeek AI
+
+Platform administrators can open **Settings → DeepSeek AI**, enter an API key and a model available to their account, enable AI, and save the connection. Enabling verifies the key and model against DeepSeek's models endpoint. Alternatively, configure `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL` in the application environment. No key is required to run the CRM.
+
+Keys entered in Settings are encrypted with AES-256-GCM using a key derived from `BETTER_AUTH_SECRET`. Preserve that secret across deployments; after rotating it, re-enter the DeepSeek key. The browser receives only connection status, never the stored key. A saved disabled configuration overrides the environment fallback.
+
+On a lead detail page, **Generate summary** sends the authorized lead's title, company, stage, description (up to 6,000 characters) and three recent notes (up to 2,000 characters each) to DeepSeek. Contact email/phone are not included as separate fields; free text may contain personal information. Requests are explicit, limited to one per user per 30 seconds, and do not change CRM records. API charges use your DeepSeek account. Review AI suggestions before acting.
+
+The deployment runs the additive AI configuration/rate-limit migration automatically. Reference: https://api-docs.deepseek.com/.

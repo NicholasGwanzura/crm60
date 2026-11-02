@@ -20,3 +20,27 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .button { @apply inline-flex h-9 items-center justify-center gap-2 rounded-md bg-neutral-900 px-3.5 text-sm font-medium text-white shadow-xs transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-neutral-400/30; }
 .panel { @apply rounded-xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.025)]; }
 .panel input:not([type="hidden"]), .panel select, .panel textarea, form > input:not([type="hidden"]) { @apply rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-xs outline-none placeholder:text-neutral-400 focus-visible:border-blue-500 focus-visible:ring-3 focus-visible:ring-blue-500/15; }
+
+/* Compact workspace controls and accessible native dialogs. */
+form input:not([type="hidden"]):not([type="checkbox"]), form select, form textarea {
+  @apply w-full min-w-0 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-neutral-400 focus-visible:border-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-200;
+}
+form textarea { @apply min-h-24 resize-y; }
+.ui-button, .ui-button-secondary { @apply h-9 px-3 text-[13px] shadow-none; }
+.ui-card, .panel { @apply rounded-lg shadow-none; }
+.workspace-dialog { @apply fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-neutral-200 bg-white p-0 text-neutral-900 shadow-2xl; }
+.workspace-dialog::backdrop { background: rgb(23 23 23 / 35%); backdrop-filter: blur(3px); }
+a:focus-visible, button:focus-visible { outline: 2px solid #737373; outline-offset: 3px; }
+
+/* Square geometry and small purposeful motion. */
+*, *::before, *::after { border-radius: 0 !important; }
+a, button, input, select, textarea { transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease; }
+button:active:not(:disabled) { transform: translateY(1px); }
+.workspace-dialog[open] { animation: dialog-enter 160ms ease-out; }
+.workspace-dialog[open]::backdrop { animation: backdrop-enter 160ms ease-out; }
+@keyframes dialog-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  button:active:not(:disabled) { transform: none; }
+}

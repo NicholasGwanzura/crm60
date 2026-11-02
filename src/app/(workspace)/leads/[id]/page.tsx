@@ -1,3 +1,5 @@
+import { LeadAiSummary } from "@/components/lead-ai-summary";
+import { Modal, ModalForm } from "@/components/modal";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -16,11 +18,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <Link className="text-sm text-blue-700" href="/leads">← Leads</Link>
       <header>
         <p className="text-sm text-blue-700">{lead.organisation.name}</p>
-        <h1 className="text-3xl font-semibold mt-1">{lead.title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight mt-1">{lead.title}</h1>
         <p className="text-neutral-500 mt-2">{lead.companyName} · {lead.visibility.toLowerCase()}</p>
       </header>
       <div className="grid gap-6 lg:grid-cols-[1fr_290px]">
-        <div className="space-y-6">
+        <div className="space-y-5">
           <section className="panel p-6">
             <h2 className="font-semibold mb-3">Overview</h2>
             <p className="whitespace-pre-wrap text-sm">{lead.description || "No description yet."}</p>
@@ -33,9 +35,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </section>
 
           {editable && (
-            <section className="panel p-6">
-              <h2 className="font-semibold mb-4">Edit details</h2>
-              <form action={updateLead} className="grid gap-4 sm:grid-cols-2">
+            <Modal title="Edit lead" trigger="Edit details"><ModalForm action={updateLead}>
                 <input type="hidden" name="id" value={id} />
                 <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Title</span><input name="title" required minLength={2} defaultValue={lead.title} aria-label="Title" /></label>
                 <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Company</span><input name="companyName" required minLength={2} defaultValue={lead.companyName} aria-label="Company name" /></label>
@@ -47,18 +47,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                   <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Currency</span><input name="currency" maxLength={3} defaultValue={lead.currency} aria-label="Currency" /></label>
                 </div>
                 <label className="block space-y-1.5 text-sm sm:col-span-2"><span className="font-medium text-neutral-700">Description</span><textarea name="description" rows={4} defaultValue={lead.description ?? ""} aria-label="Description" /></label>
-                <button className="button justify-self-start sm:col-span-2">Save changes</button>
-              </form>
-            </section>
+                </ModalForm></Modal>
           )}
 
           <section className="panel p-6">
-            <h2 className="font-semibold mb-4">Notes</h2>
-            {editable && <form action={addNote} className="space-y-3 mb-6"><input type="hidden" name="id" value={id} /><textarea name="body" required placeholder="Log a conversation or update" aria-label="New note" /><button className="button">Add note</button></form>}
+            <div className="mb-4 flex items-center justify-between"><h2 className="font-semibold">Notes <span className="ml-1 text-xs font-normal text-neutral-400">{lead.notes.length}</span></h2>{editable && <Modal title="Add note" trigger="Add note"><ModalForm action={addNote} submitLabel="Add note"><input type="hidden" name="id" value={id} /><textarea className="sm:col-span-2" name="body" required placeholder="Log a conversation or update" aria-label="New note" /></ModalForm></Modal>}</div>
             {lead.notes.length === 0 && <p className="text-sm text-neutral-500">No notes yet.</p>}
             {lead.notes.map((note) => <article className="border-t py-4" key={note.id}><p className="whitespace-pre-wrap text-sm">{note.body}</p><p className="text-xs text-neutral-500 mt-2">{note.author.name} · {note.createdAt.toLocaleString()}</p></article>)}
           </section>
 
+          <LeadAiSummary leadId={id}/>
           <section className="panel p-6">
             <h2 className="font-semibold mb-4">Activity</h2>
             {lead.activities.length === 0 && <p className="text-sm text-neutral-500">No activity yet.</p>}

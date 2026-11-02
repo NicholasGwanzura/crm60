@@ -1,4 +1,6 @@
 "use client";
+import { Modal, ModalForm } from "@/components/modal";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { createLead } from "@/app/(workspace)/leads/actions";
 
@@ -11,7 +13,7 @@ export function NewLeadForm({ organisations }: { organisations: NewLeadOrg[] }) 
   if (!org) return null;
 
   return (
-    <form action={createLead} className="grid gap-4 md:grid-cols-2">
+    <ModalForm action={createLead} submitLabel="Create lead">
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-neutral-700">Organisation</span>
         <select name="organisationId" value={orgId} onChange={(e) => setOrgId(e.target.value)} aria-label="Organisation">
@@ -28,7 +30,9 @@ export function NewLeadForm({ organisations }: { organisations: NewLeadOrg[] }) 
       <input name="companyName" required minLength={2} placeholder="Company name" aria-label="Company name" />
       <input name="email" type="email" placeholder="Email" aria-label="Email" />
       <textarea name="description" placeholder="Description" aria-label="Description" className="md:col-span-2" />
-      <button className="button justify-self-start md:col-span-2">Create lead</button>
-    </form>
+
+    </ModalForm>
   );
 }
+
+export function NewLeadButton({ organisations }: { organisations: NewLeadOrg[] }) { return <Modal title="Add lead" description="Start a new opportunity in your pipeline." trigger={<><Plus size={15}/> Add lead</>} triggerClassName="ui-button"><NewLeadForm organisations={organisations}/></Modal>; }

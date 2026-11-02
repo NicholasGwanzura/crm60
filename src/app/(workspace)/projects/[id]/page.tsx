@@ -1,3 +1,4 @@
+import { Modal, ModalForm } from "@/components/modal";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -57,26 +58,24 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               <label className="text-xs text-neutral-500">Status</label>
               <div className="flex gap-2"><select name="status" defaultValue={project.status} aria-label="Project status">{PROJECT_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}</select><button className="ui-button-secondary shrink-0">Save</button></div>
             </form>
-            <form action={updateProject} className="space-y-3">
+            <Modal title="Edit project" trigger="Edit project"><ModalForm action={updateProject}>
               <input type="hidden" name="id" value={id} />
-              <div className="grid grid-cols-[56px_1fr] gap-2">
+              <div className="grid grid-cols-[56px_1fr] gap-2 sm:col-span-2">
                 <input name="emoji" maxLength={8} defaultValue={project.emoji ?? ""} placeholder="🚀" className="text-center" aria-label="Project icon" />
                 <input name="name" required minLength={2} defaultValue={project.name} aria-label="Project name" />
               </div>
-              <textarea name="description" rows={3} defaultValue={project.description ?? ""} placeholder="Description" aria-label="Description" />
-              <button className="ui-button-secondary">Save changes</button>
-            </form>
+              <textarea className="sm:col-span-2" name="description" rows={3} defaultValue={project.description ?? ""} placeholder="Description" aria-label="Description" />
+              </ModalForm></Modal>
             <DeleteProjectButton projectId={id} />
           </div> : <div className="space-y-2 text-sm text-neutral-600"><p><span className="text-neutral-400">Status:</span> {STATUS_LABELS[status]}</p><p><span className="text-neutral-400">Owner:</span> {project.owner.name}</p><p><span className="text-neutral-400">Created:</span> {project.createdAt.toLocaleDateString()}</p></div>}
         </section>
 
         {editable && <section className="panel p-5">
-          <h2 className="mb-3 font-semibold">Add lead</h2>
-          {unassigned.length > 0 ? <form action={assignLeadToProject} className="space-y-3">
+          <h2 className="mb-3 text-sm font-semibold">Linked leads</h2>
+          {unassigned.length > 0 ? <Modal title="Link a lead" description="Choose an unassigned opportunity for this project." trigger="Link existing lead"><ModalForm action={assignLeadToProject} submitLabel="Link lead">
             <input type="hidden" name="projectId" value={id} />
-            <select name="leadId" aria-label="Lead to add" defaultValue="">{unassigned.map((l) => <option key={l.id} value={l.id}>{l.title} · {l.companyName}</option>)}</select>
-            <button className="ui-button-secondary w-full">Add to project</button>
-          </form> : <p className="text-sm text-neutral-500">No unassigned leads in this organisation.</p>}
+            <select className="sm:col-span-2" name="leadId" aria-label="Lead to add" defaultValue="">{unassigned.map((l) => <option key={l.id} value={l.id}>{l.title} · {l.companyName}</option>)}</select>
+            </ModalForm></Modal> : <p className="text-sm text-neutral-500">No unassigned leads in this organisation.</p>}
         </section>}
       </aside>
     </div>
