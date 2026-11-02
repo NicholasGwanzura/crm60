@@ -2,7 +2,7 @@
 
 This application uses HONOR Sans under the included [HONOR Sans Copyright License Agreement](src/app/fonts/HONOR-Sans-LICENSE.txt).
 
-This repository contains an initial CRM implementation. It supports invite-only email/password accounts, organisation memberships, scoped lead queries, lead creation, stage changes, notes, an activity timeline, search, and pagination. The rest of the master brief remains to be implemented before production use.
+This repository contains an initial CRM implementation. It includes Better Auth sign-in, organisation memberships, scoped lead queries, lead creation, stage changes, notes, an activity timeline, search, and pagination. The rest of the master brief remains to be implemented before production business use.
 
 ## Local setup
 
@@ -13,10 +13,10 @@ This repository contains an initial CRM implementation. It supports invite-only 
 
 No users or passwords are seeded. Public signup is disabled. A token-backed invitation acceptance flow and administrator bootstrap are still pending; the UI cannot be used with a fresh database yet.
 
-## Production status
+## Deployment status
 
-Do not deploy this as a production CRM. Email verification, invitation delivery, rate limiting, audit logs, secure document storage, jobs, integration tests, and most business modules in the master brief are incomplete. The Docker image is a build artifact for development and staging.
+The application and a private PostgreSQL service are deployed in the Dokploy production environment at `https://spiritus.click`. Dokploy runs Prisma migrations and the idempotent organisation seed before starting Next.js. The database URL and Better Auth secret are runtime environment variables; no public database port is configured. Automatic deployment is off.
 
-## Planned Dokploy domain
+This is an infrastructure deployment, not a production-ready CRM release. Public signup is disabled and no administrator account exists, so the UI cannot yet be used. Email verification, invitation delivery, rate limiting, audit logs, secure document storage, jobs, integration tests, and most business modules in the master brief are incomplete. Do not enter real customer data until those controls and workflows are implemented and reviewed.
 
-Use `spiritus.click` for the production application. Configure the Dokploy domain with HTTPS and set `BETTER_AUTH_URL=https://spiritus.click` in the production environment. Point the domain's DNS records at the Dokploy host only when the deployment is ready. Keep PostgreSQL private and use a managed or persistent database volume with backups. No deployment has been made.
+The live health check is `https://spiritus.click/api/health`. Configure database backups in Dokploy before storing durable business data.
