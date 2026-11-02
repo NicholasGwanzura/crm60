@@ -9,10 +9,15 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 12 },
 });
 
-export async function requireUser() {
+export async function currentUser() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
+  if (!session) return null;
   const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, suspended: true } });
-  if (!user || user.suspended) redirect("/sign-in");
+  return user && !user.suspended ? user : null;
+}
+
+export async function requireUser() {
+  const user = await currentUser();
+  if (!user) redirect("/");
   return user;
 }

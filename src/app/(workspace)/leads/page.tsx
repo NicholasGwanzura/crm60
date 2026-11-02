@@ -1,11 +1,15 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { leadScope } from "@/lib/permissions";
 import { createLead } from "./actions";
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
-  const user = await requireUser(); const params = await searchParams;
+  const user = await currentUser(); const params = await searchParams;
+  if (!user) {
+    const organisations = await db.organisation.findMany({ select: { id: true, name: true, stages: { orderBy: { position: "asc" }, select: { id: true, name: true } } }, orderBy: { name: "asc" } });
+    return <div className="space-y-8"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Spiritus × Velocity Workspace</p><h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Leads pipeline</h1><p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">A shared view of how opportunities move from first contact to delivery.</p></div><span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">Workspace preview</span></div><section className="ui-card p-6 md:p-8"><h2 className="text-lg font-semibold tracking-tight">Workspace setup is in progress</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">The organisations and pipeline stages are ready. Client records stay private while team access is being set up.</p></section><div className="grid gap-5 lg:grid-cols-2">{organisations.map((org) => <section key={org.id} className="ui-card overflow-hidden"><div className="border-b border-neutral-100 px-5 py-4"><h2 className="font-semibold text-neutral-900">{org.name}</h2><p className="mt-1 text-xs text-neutral-500">Lead pipeline</p></div><div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3">{org.stages.map((stage, index) => <div key={stage.id} className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-3"><div className="mb-2 text-[11px] font-medium text-neutral-400">{String(index + 1).padStart(2, "0")}</div><div className="text-sm font-medium text-neutral-700">{stage.name}</div></div>)}</div></section>)}</div><p className="text-xs text-neutral-400">HONOR Sans is used under its copyright license.</p></div>;
+  }
   const q = (params.q ?? "").slice(0, 100); const page = Math.max(1, Number(params.page) || 1);
   const where = { AND: [await leadScope(user.id), q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { companyName: { contains: q, mode: "insensitive" as const } }] } : {}] };
   const [leads, count, memberships] = await Promise.all([
