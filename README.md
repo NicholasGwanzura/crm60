@@ -14,7 +14,7 @@ A Plane-inspired CRM workspace. It provides a lead pipeline (kanban board and li
 
 ## First administrator
 
-Sign-up is disabled, so the first account is created by an operator. After seeding, run:
+Sign-up is disabled, so the first account is created by an operator. Set these environment variables and either run the seed (which bootstraps the admin automatically) or run `npm run db:admin`:
 
 ```bash
 BOOTSTRAP_ADMIN_EMAIL=you@company.com \
@@ -24,6 +24,8 @@ npm run db:admin
 ```
 
 `BOOTSTRAP_ADMIN_ORG_SLUG` defaults to `spiritus`; set it to assign the admin to a different seeded organisation. The command is idempotent — re-running it updates the name, password, and role. It does not print the password.
+
+In Dokploy, set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` as application environment variables and redeploy — the deploy's seed step creates the admin automatically. Re-running the seed re-applies the same credentials, so keep the env password as the source of truth.
 
 Then sign in at `/sign-in`. The admin can invite teammates from **Team** (email, organisation, role); invitees receive a link (`/invite/<token>`) to set a password and join.
 
