@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PLATFORM_ADMIN
+  ORG_ADMIN
+  SALES_MANAGER
+  SALES_REP
+  PROJECT_MANAGER
+  TEAM_MEMBER
+  VIEWER
+}
+enum Visibility {
+  PRIVATE
+  SHARED
+  PERSONAL
+}
+enum ActivityKind {
+  NOTE
+  STAGE_CHANGE
+  SYSTEM
+}
+
+model User {
+  id String @id @default(uuid())
+  name String
+  email String @unique
+  emailVerified Boolean @default(false)
+  image String?
+  suspended Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions Session[]
+  accounts Account[]
+  memberships OrganisationMembership[]
+  leads Lead[] @relation("LeadOwner")
+  notes Note[]
+  activities Activity[]
+}
+
+model Session {
+  id String @id
+  expiresAt DateTime
+  token String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Account {
+  id String @id
+  accountId String
+  providerId String
+  userId String
+  accessToken String?
+  refreshToken String?
+  idToken String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope String?
+  password String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Verification {
+  id String @id
+  identifier String
+  value String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([identifier])
+}
+
+model Organisation {
+  id String @id @default(uuid())
+  name String @unique
+  slug String @unique
+  memberships OrganisationMembership[]
+  leads Lead[]
+  leadAccess LeadAccess[]
+  stages LeadStage[]
+  invitations Invitation[]
+}
+
+model OrganisationMembership {
+  id String @id @default(uuid())
+  userId String
+  organisationId String
+  role Role
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  @@unique([userId, organisationId])
+  @@index([organisationId, role])
+}
+
+model Invitation {
+  id String @id @default(uuid())
+  email String
+  tokenHash String @unique
+  organisationId String
+  role Role
+  expiresAt DateTime
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  @@index([email, expiresAt])
+}
+
+model LeadStage {
+  id String @id @default(uuid())
+  name String
+  position Int
+  organisationId String
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  leads Lead[]
+  @@unique([organisationId, name])
+  @@unique([organisationId, position])
+}
+
+model Lead {
+  id String @id @default(uuid())
+  title String
+  companyName String
+  email String?
+  phone String?
+  description String?
+  country String @default("Zimbabwe")
+  currency String @default("USD")
+  estimatedValue Decimal? @db.Decimal(15, 2)
+  nextFollowUpAt DateTime?
+  visibility Visibility @default(PRIVATE)
+  organisationId String
+  ownerId String
+  stageId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  owner User @relation("LeadOwner", fields: [ownerId], references: [id])
+  stage LeadStage @relation(fields: [stageId], references: [id])
+  access LeadAccess[]
+  notes Note[]
+  activities Activity[]
+  @@index([organisationId, deletedAt, updatedAt])
+  @@index([ownerId, deletedAt])
+  @@index([stageId, deletedAt])
+}
+
+model LeadAccess {
+  leadId String
+  organisationId String
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  @@id([leadId, organisationId])
+  @@index([organisationId])
+}
+
+model Note {
+  id String @id @default(uuid())
+  body String
+  leadId String
+  authorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lead Lead @relation(fields: [leadId], references: [id])
+  author User @relation(fields: [authorId], references: [id])
+  @@index([leadId, createdAt])
+}
+
+model Activity {
+  id String @id @default(uuid())
+  kind ActivityKind
+  description String
+  leadId String
+  actorId String
+  createdAt DateTime @default(now())
+  lead Lead @relation(fields: [leadId], references: [id])
+  actor User @relation(fields: [actorId], references: [id])
+  @@index([leadId, createdAt])
+}
