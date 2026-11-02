@@ -26,6 +26,13 @@ enum ActivityKind {
   STAGE_CHANGE
   SYSTEM
 }
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
 
 model User {
   id String @id @default(uuid())
@@ -42,6 +49,7 @@ model User {
   leads Lead[] @relation("LeadOwner")
   notes Note[]
   activities Activity[]
+  projects Project[]
 }
 
 model Session {
@@ -94,6 +102,7 @@ model Organisation {
   leadAccess LeadAccess[]
   stages LeadStage[]
   invitations Invitation[]
+  projects Project[]
 }
 
 model OrganisationMembership {
@@ -146,12 +155,14 @@ model Lead {
   organisationId String
   ownerId String
   stageId String
+  projectId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
   organisation Organisation @relation(fields: [organisationId], references: [id])
   owner User @relation("LeadOwner", fields: [ownerId], references: [id])
   stage LeadStage @relation(fields: [stageId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
   access LeadAccess[]
   notes Note[]
   activities Activity[]
@@ -191,4 +202,22 @@ model Activity {
   lead Lead @relation(fields: [leadId], references: [id])
   actor User @relation(fields: [actorId], references: [id])
   @@index([leadId, createdAt])
+}
+
+model Project {
+  id String @id @default(uuid())
+  name String
+  emoji String?
+  description String?
+  status ProjectStatus @default(PLANNING)
+  organisationId String
+  ownerId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  owner User @relation(fields: [ownerId], references: [id])
+  leads Lead[]
+  @@index([organisationId, deletedAt, updatedAt])
+  @@index([ownerId, deletedAt])
 }

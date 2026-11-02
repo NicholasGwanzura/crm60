@@ -19,3 +19,16 @@ export async function canEditLead(userId: string, leadId: string) {
   const membership = await db.organisationMembership.findFirst({ where: { userId, organisationId: lead.organisationId } });
   return lead.ownerId === userId || membership?.role === "PLATFORM_ADMIN" || membership?.role === "ORG_ADMIN" || membership?.role === "SALES_MANAGER";
 }
+
+export async function projectScope(userId: string): Promise<Prisma.ProjectWhereInput> {
+  const memberships = await db.organisationMembership.findMany({ where: { userId }, select: { organisationId: true, role: true } });
+  if (memberships.some((m) => m.role === "PLATFORM_ADMIN")) return { deletedAt: null };
+  return { deletedAt: null, organisationId: { in: memberships.map((m) => m.organisationId) } };
+}
+
+export async function canEditProject(userId: string, projectId: string) {
+  const project = await db.project.findFirst({ where: { AND: [{ id: projectId }, await projectScope(userId)] }, select: { organisationId: true, ownerId: true } });
+  if (!project) return false;
+  const membership = await db.organisationMembership.findFirst({ where: { userId, organisationId: project.organisationId } });
+  return project.ownerId === userId || membership?.role === "PLATFORM_ADMIN" || membership?.role === "ORG_ADMIN" || membership?.role === "PROJECT_MANAGER";
+}

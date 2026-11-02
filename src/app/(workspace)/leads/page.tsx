@@ -1,8 +1,10 @@
-import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { leadScope } from "@/lib/permissions";
-import { createLead } from "./actions";
+import { LeadPipeline, type PipelineBoard } from "@/components/lead-pipeline";
+import { NewLeadForm, type NewLeadOrg } from "@/components/new-lead-form";
+
+const EDITABLE_ROLES = new Set(["PLATFORM_ADMIN", "ORG_ADMIN", "SALES_MANAGER"]);
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const user = await currentUser(); const params = await searchParams;
@@ -10,17 +12,33 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     const organisations = await db.organisation.findMany({ select: { id: true, name: true, stages: { orderBy: { position: "asc" }, select: { id: true, name: true } } }, orderBy: { name: "asc" } });
     return <div className="space-y-8"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Spiritus × Velocity Workspace</p><h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Leads pipeline</h1><p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">A shared view of how opportunities move from first contact to delivery.</p></div><span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">Workspace preview</span></div><section className="ui-card p-6 md:p-8"><h2 className="text-lg font-semibold tracking-tight">Workspace setup is in progress</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">The organisations and pipeline stages are ready. Client records stay private while team access is being set up.</p></section><div className="grid gap-5 lg:grid-cols-2">{organisations.map((org) => <section key={org.id} className="ui-card overflow-hidden"><div className="border-b border-neutral-100 px-5 py-4"><h2 className="font-semibold text-neutral-900">{org.name}</h2><p className="mt-1 text-xs text-neutral-500">Lead pipeline</p></div><div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3">{org.stages.map((stage, index) => <div key={stage.id} className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-3"><div className="mb-2 text-[11px] font-medium text-neutral-400">{String(index + 1).padStart(2, "0")}</div><div className="text-sm font-medium text-neutral-700">{stage.name}</div></div>)}</div></section>)}</div><p className="text-xs text-neutral-400">HONOR Sans is used under its copyright license.</p></div>;
   }
-  const q = (params.q ?? "").slice(0, 100); const page = Math.max(1, Number(params.page) || 1);
+
+  const q = (params.q ?? "").slice(0, 100);
+  const memberships = await db.organisationMembership.findMany({ where: { userId: user.id }, select: { organisationId: true, role: true } });
+  const editableOrgIds = new Set(memberships.filter((m) => EDITABLE_ROLES.has(m.role)).map((m) => m.organisationId));
+  const creatableOrgIds = new Set(memberships.filter((m) => m.role !== "VIEWER").map((m) => m.organisationId));
+
   const where = { AND: [await leadScope(user.id), q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { companyName: { contains: q, mode: "insensitive" as const } }] } : {}] };
-  const [leads, count, memberships] = await Promise.all([
-    db.lead.findMany({ where, include: { stage: true, organisation: true }, orderBy: { updatedAt: "desc" }, take: 20, skip: (page - 1) * 20 }),
-    db.lead.count({ where }),
-    db.organisationMembership.findMany({ where: { userId: user.id, role: { not: "VIEWER" } }, include: { organisation: { include: { stages: { orderBy: { position: "asc" } } } } } }),
-  ]);
-  return <div className="space-y-7"><div><p className="text-sm text-blue-800">CRM</p><h1 className="text-3xl font-semibold mt-1">Leads</h1><p className="text-neutral-500 mt-2">{count} accessible leads</p></div>
-    <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="Search leads or companies" aria-label="Search leads"/><button className="button">Search</button></form>
-    <div className="panel overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-neutral-500 border-b"><tr><th className="p-4">Lead</th><th>Company</th><th>Stage</th><th>Organisation</th><th>Updated</th></tr></thead><tbody>{leads.map((lead) => <tr key={lead.id} className="border-b last:border-0 hover:bg-neutral-50"><td className="p-4 font-medium"><Link className="hover:text-blue-700" href={`/leads/${lead.id}`}>{lead.title}</Link></td><td>{lead.companyName}</td><td>{lead.stage.name}</td><td>{lead.organisation.name}</td><td>{lead.updatedAt.toLocaleDateString()}</td></tr>)}</tbody></table>{!leads.length && <p className="p-8 text-center text-neutral-500">No accessible leads found.</p>}</div>
-    <div className="flex justify-between text-sm">{page > 1 ? <Link href={`/leads?q=${encodeURIComponent(q)}&page=${page - 1}`}>Previous</Link> : <span/>}{page * 20 < count && <Link href={`/leads?q=${encodeURIComponent(q)}&page=${page + 1}`}>Next</Link>}</div>
-    {memberships.map((membership) => <section key={membership.id} className="panel p-6"><h2 className="text-lg font-semibold mb-4">Add a lead · {membership.organisation.name}</h2><form action={createLead} className="grid md:grid-cols-2 gap-4"><input type="hidden" name="organisationId" value={membership.organisationId}/><input name="title" required minLength={2} placeholder="Lead title" aria-label="Lead title"/><input name="companyName" required minLength={2} placeholder="Company name" aria-label="Company name"/><input name="email" type="email" placeholder="Email" aria-label="Email"/><select name="stageId" aria-label="Stage" required>{membership.organisation.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select><textarea name="description" placeholder="Description" aria-label="Description" className="md:col-span-2"/><button className="button justify-self-start">Create lead</button></form></section>)}
+  const leads = await db.lead.findMany({ where, include: { owner: { select: { name: true } } }, orderBy: { updatedAt: "desc" } });
+
+  const orgIds = [...new Set([...memberships.map((m) => m.organisationId), ...leads.map((l) => l.organisationId)])];
+  const organisations = await db.organisation.findMany({ where: { id: { in: orgIds } }, include: { stages: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } });
+
+  const boards: PipelineBoard[] = organisations.map((org) => ({
+    organisationId: org.id,
+    organisationName: org.name,
+    stages: org.stages.map((s) => ({ id: s.id, name: s.name })),
+    leads: leads.filter((l) => l.organisationId === org.id).map((l) => ({ id: l.id, title: l.title, companyName: l.companyName, value: l.estimatedValue?.toString() ?? null, owner: l.owner.name, editable: l.ownerId === user.id || editableOrgIds.has(l.organisationId), stageId: l.stageId })),
+  }));
+
+  const newLeadOrgs: NewLeadOrg[] = organisations.filter((org) => creatableOrgIds.has(org.id)).map((org) => ({ id: org.id, name: org.name, stages: org.stages.map((s) => ({ id: s.id, name: s.name })) }));
+
+  return <div className="space-y-7">
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div><p className="text-sm text-blue-800">CRM</p><h1 className="text-3xl font-semibold mt-1">Leads</h1><p className="text-neutral-500 mt-2">{leads.length} accessible leads</p></div>
+      <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="Search leads or companies" aria-label="Search leads"/><button className="button">Search</button></form>
+    </div>
+    {newLeadOrgs.length > 0 && <section className="panel p-5 md:p-6"><h2 className="mb-4 text-lg font-semibold">New lead</h2><NewLeadForm organisations={newLeadOrgs} /></section>}
+    {boards.length > 0 ? <LeadPipeline boards={boards} /> : <div className="panel p-10 text-center text-neutral-500">No pipeline organisations found.</div>}
   </div>;
 }
