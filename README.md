@@ -2,21 +2,49 @@
 
 This application uses HONOR Sans under the included [HONOR Sans Copyright License Agreement](src/app/fonts/HONOR-Sans-LICENSE.txt).
 
-This repository contains an initial CRM implementation. It includes Better Auth sign-in, organisation memberships, scoped lead queries, lead creation, stage changes, notes, an activity timeline, search, and pagination. The rest of the master brief remains to be implemented before production business use.
+A Plane-inspired CRM workspace. It provides a lead pipeline (kanban board and list views), lead detail with notes and an activity timeline, a projects module with linked leads, and team management with token-backed invitations. Better Auth handles email/password sign-in, organisation memberships, scoped lead queries, and role-based permissions.
 
 ## Local setup
 
-1. Copy `.env.example` to `.env` and set a strong `BETTER_AUTH_SECRET`.
+1. Copy `.env.example` to `.env` and set a strong `BETTER_AUTH_SECRET` (at least 32 random characters).
 2. Start PostgreSQL with `docker compose up -d db`.
 3. Run `npm ci`, `npm run db:migrate`, and `npm run db:seed`.
-4. Run `npm run dev`.
+4. Create the first administrator (see below).
+5. Run `npm run dev`.
 
-No users or passwords are seeded. Public signup is disabled. A token-backed invitation acceptance flow and administrator bootstrap are still pending. The public workspace preview shows organisation and pipeline configuration without exposing client records or mutations.
+## First administrator
+
+Sign-up is disabled, so the first account is created by an operator. After seeding, run:
+
+```bash
+BOOTSTRAP_ADMIN_EMAIL=you@company.com \
+BOOTSTRAP_ADMIN_PASSWORD='a-strong-password-at-least-12-chars' \
+BOOTSTRAP_ADMIN_NAME='Your Name' \
+npm run db:admin
+```
+
+`BOOTSTRAP_ADMIN_ORG_SLUG` defaults to `spiritus`; set it to assign the admin to a different seeded organisation. The command is idempotent — re-running it updates the name, password, and role. It does not print the password.
+
+Then sign in at `/sign-in`. The admin can invite teammates from **Team** (email, organisation, role); invitees receive a link (`/invite/<token>`) to set a password and join.
+
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `BETTER_AUTH_SECRET` | Signing secret (at least 32 characters). |
+| `BETTER_AUTH_URL` | Canonical app URL (e.g. `https://spiritus.click`). |
+| `BOOTSTRAP_ADMIN_EMAIL` | Email for the first admin (bootstrap only). |
+| `BOOTSTRAP_ADMIN_PASSWORD` | Password for the first admin, 12+ characters. |
+| `BOOTSTRAP_ADMIN_NAME` | Optional display name for the first admin. |
+| `BOOTSTRAP_ADMIN_ORG_SLUG` | Optional org slug to assign the admin to (default `spiritus`). |
 
 ## Deployment status
 
-The application and a private PostgreSQL service are deployed in the Dokploy production environment at `https://spiritus.click`. Dokploy runs Prisma migrations and the idempotent organisation seed before starting Next.js. The database URL and Better Auth secret are runtime environment variables; no public database port is configured. Automatic deployment is off.
+The application and a private PostgreSQL service are deployed in the Dokploy production environment at `https://spiritus.click`. Dokploy runs Prisma migrations and the idempotent organisation seed before starting Next.js. The database URL and Better Auth secret are runtime environment variables; no public database port is configured.
 
-This is an infrastructure deployment, not a production-ready CRM release. The sign-in screen is temporarily removed; unauthenticated visitors can view only the workspace preview. Public signup is disabled and no administrator account exists. Email verification, invitation delivery, rate limiting, audit logs, secure document storage, jobs, integration tests, and most business modules in the master brief are incomplete. Do not enter real customer data until those controls and workflows are implemented and reviewed.
+**Automatic deployment is off** — pushing to the repository does not rebuild the app. To release a change, trigger a manual **Deploy** in the Dokploy dashboard (or enable auto-deploy for the application).
 
 The live health check is `https://spiritus.click/api/health`. Configure database backups in Dokploy before storing durable business data.
+
+Remaining gaps before full production use: email delivery for invitations (links are currently shared manually), email verification, rate limiting, audit logs, secure document storage, and integration tests. Do not enter real customer data until those controls are implemented and reviewed.

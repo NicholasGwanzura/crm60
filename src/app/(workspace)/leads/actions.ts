@@ -56,6 +56,30 @@ export async function setLeadProject(form: FormData) {
   revalidatePath(`/leads/${id}`); revalidatePath("/projects");
 }
 
+const leadUpdate = z.object({
+  title: z.string().trim().min(2).max(160),
+  companyName: z.string().trim().min(2).max(160),
+  email: z.union([z.email(), z.literal("")]),
+  phone: z.string().trim().max(60),
+  description: z.string().max(5000),
+  country: z.string().trim().min(1).max(100),
+  currency: z.string().trim().min(3).max(3),
+  estimatedValue: z.string().trim().max(30),
+});
+
+export async function updateLead(form: FormData) {
+  const user = await requireUser();
+  const id = z.uuid().parse(form.get("id"));
+  if (!await canEditLead(user.id, id)) throw new Error("Not authorised");
+  const input = leadUpdate.parse(Object.fromEntries(form));
+  const estimatedValue = input.estimatedValue ? z.coerce.number().positive().parse(input.estimatedValue) : null;
+  await db.$transaction([
+    db.lead.update({ where: { id }, data: { title: input.title, companyName: input.companyName, email: input.email || null, phone: input.phone || null, description: input.description || null, country: input.country || "Zimbabwe", currency: input.currency || "USD", estimatedValue } }),
+    db.activity.create({ data: { leadId: id, actorId: user.id, kind: "SYSTEM", description: "Lead updated" } }),
+  ]);
+  revalidatePath(`/leads/${id}`); revalidatePath("/leads");
+}
+
 export async function addNote(form: FormData) {
   const user = await requireUser(); const id = z.uuid().parse(form.get("id")); const body = z.string().trim().min(1).max(10000).parse(form.get("body"));
   if (!await canEditLead(user.id, id)) throw new Error("Not authorised");

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { moveLeadStage } from "@/app/(workspace)/leads/actions";
+import { moveLeadStage, changeLeadStage } from "@/app/(workspace)/leads/actions";
 
 export type PipelineLead = {
   id: string;
@@ -56,21 +56,22 @@ function Board({ board }: { board: PipelineBoard }) {
               </div>
               <div className="space-y-2 p-2">
                 {leads.map((lead) => (
-                  <Link
-                    key={lead.id}
-                    href={`/leads/${lead.id}`}
-                    draggable={lead.editable}
-                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", lead.id); e.dataTransfer.effectAllowed = "move"; setDraggingId(lead.id); }}
-                    onDragEnd={() => setDraggingId(null)}
-                    className={`block rounded-md border border-neutral-200 bg-white p-3 shadow-xs transition-opacity hover:border-blue-300 ${draggingId === lead.id ? "opacity-40" : ""} ${isPending ? "opacity-60" : ""} ${lead.editable ? "cursor-grab" : "cursor-default"}`}
-                  >
-                    <p className="text-sm font-medium text-neutral-900">{lead.title}</p>
-                    <p className="mt-0.5 text-xs text-neutral-500">{lead.companyName}</p>
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      {lead.value ? <span className="font-medium text-neutral-700">${lead.value}</span> : <span />}
-                      <span className="text-neutral-400">{lead.owner}</span>
+                  <div key={lead.id} className={`rounded-md border border-neutral-200 bg-white shadow-xs transition-opacity ${draggingId === lead.id ? "opacity-40" : ""} ${isPending ? "opacity-60" : ""}`}>
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      draggable={lead.editable}
+                      onDragStart={(e) => { e.dataTransfer.setData("text/plain", lead.id); e.dataTransfer.effectAllowed = "move"; setDraggingId(lead.id); }}
+                      onDragEnd={() => setDraggingId(null)}
+                      className={`block p-3 pb-1 hover:bg-neutral-50 ${lead.editable ? "cursor-grab" : "cursor-pointer"}`}
+                    >
+                      <p className="text-sm font-medium text-neutral-900">{lead.title}</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">{lead.companyName}</p>
+                    </Link>
+                    <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+                      {lead.value ? <span className="text-xs font-medium text-neutral-700">${lead.value}</span> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
+                      {lead.editable ? <form action={changeLeadStage} className="shrink-0"><input type="hidden" name="id" value={lead.id} /><select name="stageId" defaultValue={lead.stageId} onChange={(e) => e.currentTarget.form?.requestSubmit()} aria-label={`Move ${lead.title}`} className="rounded border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-700 outline-none hover:border-neutral-300">{board.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></form> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
                     </div>
-                  </Link>
+                  </div>
                 ))}
                 {!leads.length && <p className="rounded-md border border-dashed border-neutral-200 px-3 py-6 text-center text-xs text-neutral-400">Drop leads here</p>}
               </div>
