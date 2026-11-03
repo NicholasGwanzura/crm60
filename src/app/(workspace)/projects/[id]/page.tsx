@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditProject, canEditLead, leadScope, projectScope } from "@/lib/permissions";
+import { canEditProject, canEditLeadRecord, accessProfile, leadScope, projectScope } from "@/lib/permissions";
 import { LeadPipeline, type PipelineBoard } from "@/components/lead-pipeline";
 import { DeleteProjectButton } from "@/components/delete-project-button";
 import { assignLeadToProject, updateProject, updateProjectStatus } from "../actions";
@@ -17,9 +17,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const project = await db.project.findFirst({ where: { AND: [{ id }, await projectScope(user.id)] }, include: { organisation: { include: { stages: { orderBy: { position: "asc" } } } }, owner: true, leads: { where: await leadScope(user.id), include: { stage: true, owner: { select: { name: true } } }, orderBy: { updatedAt: "desc" } } } });
   if (!project) notFound();
 
+  const profile=await accessProfile(user.id);
   const editable = await canEditProject(user.id, id);
 
-  const editIds=new Set((await Promise.all(project.leads.map(async l=>await canEditLead(user.id,l.id)?l.id:null))).filter(Boolean));
+  const editIds=new Set(project.leads.filter(l=>canEditLeadRecord(profile,l)).map(l=>l.id));
 
   const board: PipelineBoard = {
     organisationId: project.organisationId,
@@ -28,9 +29,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     leads: project.leads.map((l) => ({ id: l.id, title: l.title, companyName: l.companyName, value: l.estimatedValue?.toString() ?? null, currency: l.currency, owner: l.owner.name, editable: editIds.has(l.id), stageId: l.stageId })),
   };
 
-  const unassignedAll = await db.lead.findMany({ where: { AND: [{ organisationId: project.organisationId, projectId: null }, await leadScope(user.id)] }, select: { id: true, title: true, companyName: true }, orderBy: { updatedAt: "desc" } });
+  const unassignedAll = await db.lead.findMany({ where: { AND: [{ organisationId: project.organisationId, projectId: null }, await leadScope(user.id)] }, select: { id: true, title: true, companyName: true, ownerId: true, organisationId: true }, orderBy: { updatedAt: "desc" } });
 
-  const unassigned=(await Promise.all(unassignedAll.map(async l=>await canEditLead(user.id,l.id)?l:null))).filter(l=>l!==null);
+  const unassigned=unassignedAll.filter(l=>canEditLeadRecord(profile,l));
   const status = project.status as ProjectStatus;
 
   return <div className="space-y-6">

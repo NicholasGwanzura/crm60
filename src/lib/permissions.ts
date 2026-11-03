@@ -1,57 +1,27 @@
+import { cache } from "react";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-
-export async function leadScope(userId: string): Promise<Prisma.LeadWhereInput> {
-  const memberships = await db.organisationMembership.findMany({ where: { userId }, select: { organisationId: true, role: true } });
-  const orgIds = memberships.map((m) => m.organisationId);
-  if (memberships.some((m) => m.role === "PLATFORM_ADMIN")) return { deletedAt: null };
-  return { deletedAt: null, OR: [
-    { visibility: "PERSONAL", ownerId: userId },
-    { visibility: "PERSONAL", organisationId: { in: memberships.filter((m) => m.role === "ORG_ADMIN").map((m) => m.organisationId) } },
-    { visibility: "PRIVATE", organisationId: { in: orgIds } },
-    { visibility: "SHARED", access: { some: { organisationId: { in: orgIds } } } },
-  ] };
-}
-
-export async function canEditLead(userId: string, leadId: string) {
-  const lead = await db.lead.findFirst({ where: { AND: [{ id: leadId }, await leadScope(userId)] }, select: { organisationId: true, ownerId: true } });
-  if (!lead) return false;
-  const membership = await db.organisationMembership.findFirst({ where: { userId, organisationId: lead.organisationId } });
-  return await isPlatformAdmin(userId) || (!!membership && membership.role !== "VIEWER" && (lead.ownerId === userId || membership.role === "ORG_ADMIN" || membership.role === "SALES_MANAGER"));
-}
-
-export async function projectScope(userId: string): Promise<Prisma.ProjectWhereInput> {
-  const memberships = await db.organisationMembership.findMany({ where: { userId }, select: { organisationId: true, role: true } });
-  if (memberships.some((m) => m.role === "PLATFORM_ADMIN")) return { deletedAt: null };
-  return { deletedAt: null, organisationId: { in: memberships.map((m) => m.organisationId) } };
-}
-
-export async function canEditProject(userId: string, projectId: string) {
-  const project = await db.project.findFirst({ where: { AND: [{ id: projectId }, await projectScope(userId)] }, select: { organisationId: true, ownerId: true } });
-  if (!project) return false;
-  const membership = await db.organisationMembership.findFirst({ where: { userId, organisationId: project.organisationId } });
-  return await isPlatformAdmin(userId) || (!!membership && membership.role !== "VIEWER" && (project.ownerId === userId || membership.role === "ORG_ADMIN" || membership.role === "PROJECT_MANAGER"));
-}
-
-export async function isPlatformAdmin(userId: string) {
-  return !!await db.organisationMembership.findFirst({ where: { userId, role: "PLATFORM_ADMIN" }, select: { id: true } });
-}
-export async function organisationScope(userId: string) {
-  if (await isPlatformAdmin(userId)) return {};
-  return { memberships: { some: { userId } } };
-}
-export async function canWriteOrganisation(userId: string, organisationId: string) {
-  if (await isPlatformAdmin(userId)) return true;
-  return !!await db.organisationMembership.findFirst({ where: { userId, organisationId, role: { not: "VIEWER" } } });
-}
-export async function canApproveQuote(userId: string, organisationId: string) {
-  return await isPlatformAdmin(userId) || !!await db.organisationMembership.findFirst({ where: { userId, organisationId, role: { in: ["ORG_ADMIN", "SALES_MANAGER"] } } });
-}
-
-export async function taskScope(userId:string):Promise<Prisma.TaskWhereInput>{
- return {OR:[{lead:await leadScope(userId)},{leadId:null,assigneeId:userId,organisation:await organisationScope(userId)}]};
-}
+import {canEditLeadRecord,canEditProjectRecord,canWriteOrganisationRecord,organisationRole} from "@/lib/access-policy";
+export {canEditLeadRecord,canEditProjectRecord,canWriteOrganisationRecord} from "@/lib/access-policy";
+// React cache deduplicates only within one server render/request, never across users or requests.
+export const accessProfile=cache(async(userId:string)=>{
+ const memberships=await db.organisationMembership.findMany({where:{userId},select:{organisationId:true,role:true}});
+ return {userId,memberships,platformAdmin:memberships.some(m=>m.role==="PLATFORM_ADMIN")};
+});
+export const leadScope=cache(async(userId:string):Promise<Prisma.LeadWhereInput>=>{
+ const profile=await accessProfile(userId);const orgIds=profile.memberships.map(m=>m.organisationId);
+ if(profile.platformAdmin)return {deletedAt:null};
+ return {deletedAt:null,OR:[{visibility:"PERSONAL",ownerId:userId},{visibility:"PERSONAL",organisationId:{in:profile.memberships.filter(m=>m.role==="ORG_ADMIN").map(m=>m.organisationId)}},{visibility:"PRIVATE",organisationId:{in:orgIds}},{visibility:"SHARED",access:{some:{organisationId:{in:orgIds}}}}]};
+});
+export const projectScope=cache(async(userId:string):Promise<Prisma.ProjectWhereInput>=>{const profile=await accessProfile(userId);return profile.platformAdmin?{deletedAt:null}:{deletedAt:null,organisationId:{in:profile.memberships.map(m=>m.organisationId)}};});
+export const organisationScope=cache(async(userId:string):Promise<Prisma.OrganisationWhereInput>=>{const profile=await accessProfile(userId);return profile.platformAdmin?{}:{id:{in:profile.memberships.map(m=>m.organisationId)}};});
+export async function isPlatformAdmin(userId:string){return (await accessProfile(userId)).platformAdmin;}
+export async function canWriteOrganisation(userId:string,id:string){return canWriteOrganisationRecord(await accessProfile(userId),id);}
+export async function canApproveQuote(userId:string,id:string){const p=await accessProfile(userId);const role=organisationRole(p,id);return p.platformAdmin||role==="ORG_ADMIN"||role==="SALES_MANAGER";}
+export const canEditLead=cache(async(userId:string,id:string)=>{const [profile,lead]=await Promise.all([accessProfile(userId),db.lead.findFirst({where:{AND:[{id},await leadScope(userId)]},select:{organisationId:true,ownerId:true}})]);return !!lead&&canEditLeadRecord(profile,lead);});
+export const canEditProject=cache(async(userId:string,id:string)=>{const [profile,project]=await Promise.all([accessProfile(userId),db.project.findFirst({where:{AND:[{id},await projectScope(userId)]},select:{organisationId:true,ownerId:true}})]);return !!project&&canEditProjectRecord(profile,project);});
+export const taskScope=cache(async(userId:string):Promise<Prisma.TaskWhereInput>=>({OR:[{lead:await leadScope(userId)},{leadId:null,assigneeId:userId,organisation:await organisationScope(userId)}]}));
 export async function canManageTask(userId:string,task:{leadId:string|null;assigneeId:string;organisationId:string|null}){
- if(task.leadId)return await canEditLead(userId,task.leadId)||(task.assigneeId===userId&&!!await db.task.findFirst({where:{leadId:task.leadId,assigneeId:userId,lead:await leadScope(userId)}})&&!!task.organisationId&&await canWriteOrganisation(userId,task.organisationId));
+ if(task.leadId){if(await canEditLead(userId,task.leadId))return true;return task.assigneeId===userId&&!!task.organisationId&&await canWriteOrganisation(userId,task.organisationId)&&!!await db.lead.findFirst({where:{AND:[{id:task.leadId},await leadScope(userId)]},select:{id:true}});}
  return task.assigneeId===userId&&!!task.organisationId&&await canWriteOrganisation(userId,task.organisationId);
 }

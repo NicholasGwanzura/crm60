@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { taskScope,leadScope,canEditLead,canManageTask,canWriteOrganisation,organisationScope } from "@/lib/permissions";
+import { taskScope,leadScope,canEditLeadRecord,accessProfile,canWriteOrganisationRecord,canWriteOrganisation,organisationScope } from "@/lib/permissions";
 import { PageHeader,EmptyState,Stat } from "@/components/crm-ui";
 import { TaskForm } from "@/components/task-form";
 import { TimerControl } from "@/components/timer-control";
@@ -9,12 +9,13 @@ import { toggleTask } from "./actions";
 import { date,trackedTime,timeLabel } from "@/lib/crm-format";
 export default async function MyWork({searchParams}:{searchParams:Promise<{status?:string}>}){
  const user=await requireUser();const params=await searchParams;const status=["open","overdue","upcoming","completed"].includes(params.status??"")?params.status!:"today";
+ const profile=await accessProfile(user.id);
  const now=new Date();const todayDate=new Date(now.getTime()+7200000).toISOString().slice(0,10);const todayStart=new Date(`${todayDate}T00:00:00+02:00`);const todayEnd=new Date(todayStart.getTime()+86400000);
- const [all,accessible,orgs]=await Promise.all([db.task.findMany({where:{AND:[{assigneeId:user.id},await taskScope(user.id)]},include:{lead:{select:{id:true,title:true,organisationId:true}},timeEntries:{where:{userId:user.id}}},orderBy:[{completedAt:"asc"},{dueAt:"asc"}]}),db.lead.findMany({where:await leadScope(user.id),select:{id:true,title:true,organisationId:true},orderBy:{title:"asc"}}),db.organisation.findMany({where:{memberships:{some:{userId:user.id,role:{not:"VIEWER"}}}},select:{id:true,name:true}})]);
- const editable=(await Promise.all(accessible.map(async l=>await canEditLead(user.id,l.id)?l:null))).filter(l=>l!==null);const organisations=(await Promise.all(orgs.map(async o=>await canWriteOrganisation(user.id,o.id)?o:null))).filter(o=>o!==null);
+ const [all,accessible,orgs]=await Promise.all([db.task.findMany({where:{AND:[{assigneeId:user.id},await taskScope(user.id)]},include:{lead:{select:{id:true,title:true,organisationId:true,ownerId:true}},timeEntries:{where:{userId:user.id}}},orderBy:[{completedAt:"asc"},{dueAt:"asc"}]}),db.lead.findMany({where:await leadScope(user.id),select:{id:true,title:true,organisationId:true,ownerId:true},orderBy:{title:"asc"}}),db.organisation.findMany({where:{memberships:{some:{userId:user.id,role:{not:"VIEWER"}}}},select:{id:true,name:true}})]);
+ const editable=accessible.filter(l=>canEditLeadRecord(profile,l));const organisations=(await Promise.all(orgs.map(async o=>await canWriteOrganisation(user.id,o.id)?o:null))).filter(o=>o!==null);
  const members=await db.organisationMembership.findMany({where:{organisationId:{in:[...new Set([...editable.map(l=>l.organisationId),...organisations.map(o=>o.id)])]},role:{not:"VIEWER"},user:{suspended:false}},select:{organisationId:true,userId:true,user:{select:{name:true}}}});const memberOptions=members.map(m=>({organisationId:m.organisationId,userId:m.userId,name:m.user.name}));
  const tasks=all.filter(t=>status==="completed"?!!t.completedAt:!t.completedAt&&(status==="overdue"?t.dueAt<now:status==="upcoming"?t.dueAt>=todayEnd:status==="today"?t.dueAt>=todayStart&&t.dueAt<todayEnd:true));
- const manage=new Set((await Promise.all(all.map(async t=>await canManageTask(user.id,t)?t.id:null))).filter(Boolean));
+ const manage=new Set(all.filter(t=>t.lead?canEditLeadRecord(profile,t.lead)||(t.assigneeId===user.id&&canWriteOrganisationRecord(profile,t.lead.organisationId)):t.assigneeId===user.id&&!!t.organisationId&&canWriteOrganisationRecord(profile,t.organisationId)).map(t=>t.id));
  const todayEntries=await db.timeEntry.findMany({where:{userId:user.id,stoppedAt:{gte:todayStart}}});const todaySeconds=todayEntries.reduce((sum,t)=>sum+(t.stoppedAt!.getTime()-Math.max(t.startedAt.getTime(),todayStart.getTime()))/1000,0);
  return <><PageHeader title="My work" description={`${date(now)} · Your daily plan, follow-ups, and tracked time.`} action={organisations.length>0?<TaskForm leads={editable} members={memberOptions} organisations={organisations} userId={user.id}/>:undefined}/><div className="mb-8 grid grid-cols-2 gap-6 lg:grid-cols-4"><Stat label="Today" value={all.filter(t=>!t.completedAt&&t.dueAt>=todayStart&&t.dueAt<todayEnd).length}/><Stat label="Overdue" value={all.filter(t=>!t.completedAt&&t.dueAt<now).length}/><Stat label="Completed" value={all.filter(t=>t.completedAt).length}/><Stat label="Time logged today" value={timeLabel(todaySeconds)} hint="Stopped timers · Harare time"/></div>
  <nav className="mb-5 flex flex-wrap gap-5 border-b text-xs">{["today","open","overdue","upcoming","completed"].map(s=><Link key={s} href={`/my-work?status=${s}`} aria-current={s===status?"page":undefined} className={`pb-3 capitalize ${s===status?"border-b-2 border-neutral-900 font-medium":"text-neutral-500"}`}>{s}</Link>)}</nav>

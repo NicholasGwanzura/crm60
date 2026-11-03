@@ -1,0 +1,5 @@
+import {expect,it} from "vitest";
+import {aiSettingsInput,DEFAULT_DEEPSEEK_MODEL} from "@/lib/ai-settings-input";
+it("accepts current DeepSeek identifiers and trims pasted input",()=>{expect(aiSettingsInput.parse({apiKey:"  sk-test  ",model:" deepseek-flash ",enabled:true})).toEqual({apiKey:"sk-test",model:DEFAULT_DEEPSEEK_MODEL,enabled:true});expect(aiSettingsInput.safeParse({apiKey:"",model:"deepseek-v4-pro",enabled:false}).success).toBe(true);});
+it("identifies a missing or human-readable model separately from the API key",()=>{for(const model of ["","DeepSeek Flash"]){const result=aiSettingsInput.safeParse({apiKey:"sk-test",model,enabled:true});expect(result.success).toBe(false);if(!result.success)expect(result.error.flatten().fieldErrors.model).toBeTruthy();}});
+it("rejects Bearer headers pasted instead of API keys",()=>{const result=aiSettingsInput.safeParse({apiKey:"Bearer sk-test",model:DEFAULT_DEEPSEEK_MODEL,enabled:true});expect(result.success).toBe(false);if(!result.success)expect(result.error.flatten().fieldErrors.apiKey).toBeTruthy();});

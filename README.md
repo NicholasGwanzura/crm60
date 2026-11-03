@@ -77,3 +77,11 @@ The UI retains square corners, HONOR Sans, reduced-motion support, and accessibl
 ## Verification
 
 `npm test` runs focused tests for encryption, access guards, filter behaviour and quote arithmetic. `tests/workflows.integration.test.ts` is opt-in: set `CRM_INTEGRATION=1` and a `DATABASE_URL` pointing to a disposable PostgreSQL database whose name starts with `crm60_verify_`, after applying migrations. It exercises real company/contact, lead, task, timer, quote approval/conversion, issue resolution, saved-view and bulk-action workflows. Never point this integration suite at the production database.
+
+### DeepSeek model selection
+
+Use `deepseek-flash` for CRM summaries (the default), or `deepseek-v4-pro` for more complex analysis. The Settings model picker also supports an exact custom identifier returned by DeepSeek's models endpoint. Model and API-key formatting errors are shown separately. Enabling AI still verifies the selected model against the account's actual available models. Summaries explicitly disable thinking mode to avoid spending their small output budget on reasoning. Current model reference: https://api-docs.deepseek.com/quick_start/pricing/.
+
+### Navigation performance
+
+Session and membership reads are deduplicated within each server render using `React.cache`; permissions are not cached across requests or users. Scoped record lists reuse the loaded access profile instead of making additional permission queries per row. Sidebar reminder counts and the active timer stream independently of page content. Workspace and lead-drawer loading boundaries provide immediate navigation feedback while dynamic content loads. The sidebar shows a pending indicator for an active navigation.

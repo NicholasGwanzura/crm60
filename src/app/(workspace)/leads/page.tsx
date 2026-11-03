@@ -2,7 +2,7 @@ import { WorkspaceGate } from "@/components/workspace-gate";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leadScope,canEditLead,canWriteOrganisation,organisationScope } from "@/lib/permissions";
+import { leadScope,canEditLeadRecord,accessProfile,canWriteOrganisation,organisationScope } from "@/lib/permissions";
 import { LeadPipeline,type PipelineBoard } from "@/components/lead-pipeline";
 import { NewLeadButton } from "@/components/new-lead-form";
 import { LeadList } from "@/components/lead-list";
@@ -14,12 +14,12 @@ export default async function LeadsPage({searchParams}:{searchParams:Promise<Rec
  const user=await currentUser();if(!user)return <WorkspaceGate title="Leads"/>;const params=await searchParams;
  let filters=parseLeadFilters(params);
  if(params.saved){const saved=await db.savedView.findFirst({where:{id:params.saved,userId:user.id}});const parsed=leadFilterSchema.safeParse(saved?.filters);if(parsed.success)filters=parsed.data;}
- const scope=await leadScope(user.id);
+ const [scope,profile]=await Promise.all([leadScope(user.id),accessProfile(user.id)]);
  const [leads,organisations,savedViews]=await Promise.all([db.lead.findMany({where:{AND:[scope,...leadFilterWhere(filters,user.id)]},include:{owner:{select:{name:true}},stage:{select:{name:true}},organisation:{select:{name:true}}},orderBy:{updatedAt:"desc"}}),db.organisation.findMany({where:await organisationScope(user.id),include:{companies:{select:{id:true,name:true},orderBy:{name:"asc"}},stages:{orderBy:{position:"asc"}},memberships:{where:{role:{not:"VIEWER"},user:{suspended:false}},include:{user:{select:{name:true}}}}},orderBy:{name:"asc"}}),db.savedView.findMany({where:{userId:user.id},orderBy:{createdAt:"asc"}})]);
  const visibleOrgIds=await db.lead.findMany({where:scope,distinct:["organisationId"],select:{organisationId:true}});
  const missingOrgIds=visibleOrgIds.map(l=>l.organisationId).filter(id=>!organisations.some(o=>o.id===id));
  if(missingOrgIds.length)organisations.push(...await db.organisation.findMany({where:{id:{in:missingOrgIds}},include:{companies:{where:{id:{in:[]}},select:{id:true,name:true}},stages:{orderBy:{position:"asc"}},memberships:{where:{userId:user.id},include:{user:{select:{name:true}}}}}}));
- const editMap=new Map((await Promise.all(leads.map(async l=>[l.id,await canEditLead(user.id,l.id)] as const))));
+ const editMap=new Map(leads.map(l=>[l.id,canEditLeadRecord(profile,l)] as const));
  const creatable=(await Promise.all(organisations.map(async o=>await canWriteOrganisation(user.id,o.id)?o:null))).filter(o=>o!==null);
  const boards:PipelineBoard[]=organisations.filter(o=>(!filters.org||o.id===filters.org)&&(filters.org===o.id||leads.some(l=>l.organisationId===o.id))).map(org=>({organisationId:org.id,organisationName:org.name,stages:org.stages.filter(s=>(!filters.stage||s.id===filters.stage)&&(filters.closed==="show"||!["Won","Lost"].includes(s.name))).map(s=>({id:s.id,name:s.name})),leads:leads.filter(l=>l.organisationId===org.id).map(l=>({id:l.id,title:l.title,companyName:l.companyName,value:l.estimatedValue?.toString()??null,currency:l.currency,owner:l.owner.name,editable:!!editMap.get(l.id),stageId:l.stageId}))}));
  const members=organisations.flatMap(o=>o.memberships.map(m=>({id:m.userId,name:m.user.name,organisationId:o.id})));

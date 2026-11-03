@@ -241,7 +241,7 @@ model Project {
 model AiConfiguration {
   id String @id
   encryptedKey String?
-  model String @default("deepseek-chat")
+  model String @default("deepseek-flash")
   enabled Boolean @default(false)
   updatedAt DateTime @updatedAt
 }
