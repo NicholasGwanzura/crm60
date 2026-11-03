@@ -4,7 +4,7 @@ import { ArrowUpRight, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projectScope } from "@/lib/permissions";
+import { projectScope, leadScope } from "@/lib/permissions";
 import { NewProjectButton } from "@/components/new-project-form";
 import { STATUS_LABELS, STATUS_STYLES, type ProjectStatus } from "@/lib/project-status";
 
@@ -15,7 +15,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const q = (params.q ?? "").slice(0, 100);
   const where = { AND: [await projectScope(user.id), q ? { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { description: { contains: q, mode: "insensitive" as const } }] } : {}] };
   const [projects, memberships] = await Promise.all([
-    db.project.findMany({ where, include: { organisation: { select: { name: true } }, owner: { select: { name: true } }, _count: { select: { leads: { where: { deletedAt: null } } } } }, orderBy: { updatedAt: "desc" } }),
+    db.project.findMany({ where, include: { organisation: { select: { name: true } }, owner: { select: { name: true } }, _count: { select: { leads: { where: await leadScope(user.id) } } } }, orderBy: { updatedAt: "desc" } }),
     db.organisationMembership.findMany({ where: { userId: user.id, role: { not: "VIEWER" } }, select: { organisationId: true }, distinct: ["organisationId"] }),
   ]);
   const creatableOrgs = await db.organisation.findMany({ where: { id: { in: memberships.map((m) => m.organisationId) } }, select: { id: true, name: true }, orderBy: { name: "asc" } });

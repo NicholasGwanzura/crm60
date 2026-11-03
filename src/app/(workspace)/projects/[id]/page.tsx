@@ -1,9 +1,10 @@
+import { Field } from "@/components/crm-ui";
 import { Modal, ModalForm } from "@/components/modal";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditProject, leadScope, projectScope } from "@/lib/permissions";
+import { canEditProject, canEditLead, leadScope, projectScope } from "@/lib/permissions";
 import { LeadPipeline, type PipelineBoard } from "@/components/lead-pipeline";
 import { DeleteProjectButton } from "@/components/delete-project-button";
 import { assignLeadToProject, updateProject, updateProjectStatus } from "../actions";
@@ -13,22 +14,23 @@ const EDITABLE_ROLES = new Set(["PLATFORM_ADMIN", "ORG_ADMIN", "SALES_MANAGER"])
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser(); const { id } = await params;
-  const project = await db.project.findFirst({ where: { AND: [{ id }, await projectScope(user.id)] }, include: { organisation: { include: { stages: { orderBy: { position: "asc" } } } }, owner: true, leads: { where: { deletedAt: null }, include: { stage: true, owner: { select: { name: true } } }, orderBy: { updatedAt: "desc" } } } });
+  const project = await db.project.findFirst({ where: { AND: [{ id }, await projectScope(user.id)] }, include: { organisation: { include: { stages: { orderBy: { position: "asc" } } } }, owner: true, leads: { where: await leadScope(user.id), include: { stage: true, owner: { select: { name: true } } }, orderBy: { updatedAt: "desc" } } } });
   if (!project) notFound();
 
   const editable = await canEditProject(user.id, id);
-  const membership = await db.organisationMembership.findFirst({ where: { userId: user.id, organisationId: project.organisationId } });
-  const canMoveLeads = !!membership && EDITABLE_ROLES.has(membership.role);
+
+  const editIds=new Set((await Promise.all(project.leads.map(async l=>await canEditLead(user.id,l.id)?l.id:null))).filter(Boolean));
 
   const board: PipelineBoard = {
     organisationId: project.organisationId,
     organisationName: project.name,
     stages: project.organisation.stages.map((s) => ({ id: s.id, name: s.name })),
-    leads: project.leads.map((l) => ({ id: l.id, title: l.title, companyName: l.companyName, value: l.estimatedValue?.toString() ?? null, owner: l.owner.name, editable: l.ownerId === user.id || canMoveLeads, stageId: l.stageId })),
+    leads: project.leads.map((l) => ({ id: l.id, title: l.title, companyName: l.companyName, value: l.estimatedValue?.toString() ?? null, currency: l.currency, owner: l.owner.name, editable: editIds.has(l.id), stageId: l.stageId })),
   };
 
-  const unassigned = await db.lead.findMany({ where: { AND: [{ organisationId: project.organisationId, projectId: null }, await leadScope(user.id)] }, select: { id: true, title: true, companyName: true }, orderBy: { updatedAt: "desc" } });
+  const unassignedAll = await db.lead.findMany({ where: { AND: [{ organisationId: project.organisationId, projectId: null }, await leadScope(user.id)] }, select: { id: true, title: true, companyName: true }, orderBy: { updatedAt: "desc" } });
 
+  const unassigned=(await Promise.all(unassignedAll.map(async l=>await canEditLead(user.id,l.id)?l:null))).filter(l=>l!==null);
   const status = project.status as ProjectStatus;
 
   return <div className="space-y-6">
@@ -42,6 +44,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <p className="mt-2 text-xs text-neutral-400">{project.organisation.name} · owned by {project.owner.name}</p>
         </div>
       </div>
+      <Link href={`/issues?project=${id}`} className="ui-button-secondary">Project issues ↗</Link>
     </header>
 
     <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
@@ -60,11 +63,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </form>
             <Modal title="Edit project" trigger="Edit project"><ModalForm action={updateProject}>
               <input type="hidden" name="id" value={id} />
-              <div className="grid grid-cols-[56px_1fr] gap-2 sm:col-span-2">
-                <input name="emoji" maxLength={8} defaultValue={project.emoji ?? ""} placeholder="🚀" className="text-center" aria-label="Project icon" />
-                <input name="name" required minLength={2} defaultValue={project.name} aria-label="Project name" />
-              </div>
-              <textarea className="sm:col-span-2" name="description" rows={3} defaultValue={project.description ?? ""} placeholder="Description" aria-label="Description" />
+              <Field label="Project icon"><input name="emoji" maxLength={8} defaultValue={project.emoji??""}/></Field><Field label="Project name"><input name="name" required minLength={2} maxLength={160} defaultValue={project.name}/></Field><Field label="Description" wide><textarea name="description" rows={4} defaultValue={project.description??""} maxLength={5000}/></Field>
               </ModalForm></Modal>
             <DeleteProjectButton projectId={id} />
           </div> : <div className="space-y-2 text-sm text-neutral-600"><p><span className="text-neutral-400">Status:</span> {STATUS_LABELS[status]}</p><p><span className="text-neutral-400">Owner:</span> {project.owner.name}</p><p><span className="text-neutral-400">Created:</span> {project.createdAt.toLocaleDateString()}</p></div>}
@@ -74,7 +73,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <h2 className="mb-3 text-sm font-semibold">Linked leads</h2>
           {unassigned.length > 0 ? <Modal title="Link a lead" description="Choose an unassigned opportunity for this project." trigger="Link existing lead"><ModalForm action={assignLeadToProject} submitLabel="Link lead">
             <input type="hidden" name="projectId" value={id} />
-            <select className="sm:col-span-2" name="leadId" aria-label="Lead to add" defaultValue="">{unassigned.map((l) => <option key={l.id} value={l.id}>{l.title} · {l.companyName}</option>)}</select>
+            <Field label="Lead" wide><select name="leadId" aria-label="Lead to add" defaultValue="">{unassigned.map((l) => <option key={l.id} value={l.id}>{l.title} · {l.companyName}</option>)}</select></Field>
             </ModalForm></Modal> : <p className="text-sm text-neutral-500">No unassigned leads in this organisation.</p>}
         </section>}
       </aside>

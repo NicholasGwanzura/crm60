@@ -50,6 +50,12 @@ model User {
   notes Note[]
   activities Activity[]
   projects Project[]
+  tasks Task[]
+  savedViews SavedView[]
+  assignedIssues Issue[] @relation("IssueAssignee")
+  reportedIssues Issue[] @relation("IssueReporter")
+  issueEvents IssueEvent[]
+  timeEntries TimeEntry[]
 }
 
 model Session {
@@ -103,6 +109,8 @@ model Organisation {
   stages LeadStage[]
   invitations Invitation[]
   projects Project[]
+  companies Company[]
+  tasks Task[]
 }
 
 model OrganisationMembership {
@@ -156,6 +164,9 @@ model Lead {
   ownerId String
   stageId String
   projectId String?
+  companyId String?
+  expectedCloseAt DateTime?
+  stageChangedAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -163,6 +174,9 @@ model Lead {
   owner User @relation("LeadOwner", fields: [ownerId], references: [id])
   stage LeadStage @relation(fields: [stageId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  tasks Task[]
+  quotes Quote[]
   access LeadAccess[]
   notes Note[]
   activities Activity[]
@@ -218,6 +232,8 @@ model Project {
   organisation Organisation @relation(fields: [organisationId], references: [id])
   owner User @relation(fields: [ownerId], references: [id])
   leads Lead[]
+  quotes Quote[]
+  issues Issue[]
   @@index([organisationId, deletedAt, updatedAt])
   @@index([ownerId, deletedAt])
 }
@@ -232,4 +248,153 @@ model AiConfiguration {
 model AiRateLimit {
   userId String @id
   lastRequestedAt DateTime
+}
+
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+model Company {
+  id String @id @default(uuid())
+  name String
+  website String?
+  industry String?
+  description String?
+  organisationId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  contacts Contact[]
+  leads Lead[]
+  @@index([organisationId, name])
+}
+
+model Contact {
+  id String @id @default(uuid())
+  name String
+  jobTitle String?
+  email String?
+  phone String?
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+model Task {
+  id String @id @default(uuid())
+  title String
+  description String?
+  dueAt DateTime
+  priority String @default("NORMAL")
+  completedAt DateTime?
+  assigneeId String
+  leadId String?
+  organisationId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignee User @relation(fields: [assigneeId], references: [id])
+  lead Lead? @relation(fields: [leadId], references: [id])
+  organisation Organisation? @relation(fields: [organisationId], references: [id])
+  timeEntries TimeEntry[]
+  @@index([assigneeId, completedAt, dueAt])
+  @@index([leadId])
+}
+
+model Quote {
+  id String @id @default(uuid())
+  number Int @unique @default(autoincrement())
+  title String
+  status QuoteStatus @default(DRAFT)
+  currency String @default("USD")
+  taxRate Decimal @default(0) @db.Decimal(5, 2)
+  notes String?
+  validUntil DateTime
+  leadId String
+  projectId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lead Lead @relation(fields: [leadId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+  items QuoteItem[]
+  @@index([leadId, status])
+}
+
+model QuoteItem {
+  id String @id @default(uuid())
+  quoteId String
+  description String
+  quantity Decimal @db.Decimal(12, 2)
+  unitPrice Decimal @db.Decimal(15, 2)
+  position Int
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  @@index([quoteId, position])
+}
+
+model SavedView {
+  id String @id @default(uuid())
+  name String
+  userId String
+  filters Json
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+model Issue {
+  id String @id @default(uuid())
+  title String
+  description String
+  priority String @default("NORMAL")
+  status IssueStatus @default(OPEN)
+  resolution String?
+  resolvedAt DateTime?
+  projectId String
+  assigneeId String
+  reporterId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields: [projectId], references: [id])
+  assignee User @relation("IssueAssignee", fields: [assigneeId], references: [id])
+  reporter User @relation("IssueReporter", fields: [reporterId], references: [id])
+  events IssueEvent[]
+  timeEntries TimeEntry[]
+  @@index([projectId, status])
+  @@index([assigneeId, status])
+}
+model IssueEvent {
+  id String @id @default(uuid())
+  issueId String
+  actorId String
+  description String
+  createdAt DateTime @default(now())
+  issue Issue @relation(fields: [issueId], references: [id])
+  actor User @relation(fields: [actorId], references: [id])
+  @@index([issueId, createdAt])
+}
+model TimeEntry {
+  id String @id @default(uuid())
+  userId String
+  taskId String?
+  issueId String?
+  startedAt DateTime @default(now())
+  stoppedAt DateTime?
+  user User @relation(fields: [userId], references: [id])
+  task Task? @relation(fields: [taskId], references: [id])
+  issue Issue? @relation(fields: [issueId], references: [id])
+  @@index([taskId])
+  @@index([issueId])
+  @@index([userId, stoppedAt])
 }

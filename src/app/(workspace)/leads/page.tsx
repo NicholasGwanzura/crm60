@@ -2,62 +2,30 @@ import { WorkspaceGate } from "@/components/workspace-gate";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leadScope } from "@/lib/permissions";
-import { LeadPipeline, type PipelineBoard } from "@/components/lead-pipeline";
-import { NewLeadButton, type NewLeadOrg } from "@/components/new-lead-form";
-
-const EDITABLE_ROLES = new Set(["PLATFORM_ADMIN", "ORG_ADMIN", "SALES_MANAGER"]);
-
-export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; view?: string; org?: string }> }) {
-  const user = await currentUser(); const params = await searchParams;
-  if (!user) return <WorkspaceGate title="Leads" />;
-
-  const q = (params.q ?? "").slice(0, 100);
-  const view = params.view === "list" ? "list" : "board";
-  const orgFilter = (params.org ?? "").slice(0, 40);
-
-  const memberships = await db.organisationMembership.findMany({ where: { userId: user.id }, select: { organisationId: true, role: true } });
-  const editableOrgIds = new Set(memberships.filter((m) => EDITABLE_ROLES.has(m.role)).map((m) => m.organisationId));
-  const creatableOrgIds = new Set(memberships.filter((m) => m.role !== "VIEWER").map((m) => m.organisationId));
-
-  const where = { AND: [await leadScope(user.id), orgFilter ? { organisationId: orgFilter } : {}, q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { companyName: { contains: q, mode: "insensitive" as const } }] } : {}] };
-  const leads = await db.lead.findMany({ where, include: { owner: { select: { name: true } }, stage: { select: { name: true } }, organisation: { select: { name: true } } }, orderBy: { updatedAt: "desc" } });
-
-  const orgIds = [...new Set([...memberships.map((m) => m.organisationId), ...leads.map((l) => l.organisationId)])];
-  const organisations = await db.organisation.findMany({ where: { id: { in: orgIds } }, include: { stages: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } });
-
-  const boards: PipelineBoard[] = organisations.map((org) => ({
-    organisationId: org.id,
-    organisationName: org.name,
-    stages: org.stages.map((s) => ({ id: s.id, name: s.name })),
-    leads: leads.filter((l) => l.organisationId === org.id).map((l) => ({ id: l.id, title: l.title, companyName: l.companyName, value: l.estimatedValue?.toString() ?? null, owner: l.owner.name, editable: l.ownerId === user.id || editableOrgIds.has(l.organisationId), stageId: l.stageId })),
-  }));
-
-  const newLeadOrgs: NewLeadOrg[] = organisations.filter((org) => creatableOrgIds.has(org.id)).map((org) => ({ id: org.id, name: org.name, stages: org.stages.map((s) => ({ id: s.id, name: s.name })) }));
-
-  const sp = new URLSearchParams();
-  if (q) sp.set("q", q);
-  if (orgFilter) sp.set("org", orgFilter);
-  const viewHref = (v: "board" | "list") => { const p = new URLSearchParams(sp); if (v !== "board") p.set("view", v); return p.size ? `/leads?${p}` : "/leads"; };
-
-  return <div className="space-y-6">
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><h1 className="text-xl font-semibold tracking-tight">Leads <span className="ml-2 text-sm font-normal text-neutral-400">{leads.length}</span></h1><p className="mt-1 text-sm text-neutral-500">Every opportunity, from first contact to close.</p></div>{newLeadOrgs.length > 0 && <NewLeadButton organisations={newLeadOrgs} />}
-    </div><div className="flex flex-wrap items-center justify-between gap-3 border-y py-3">
-        <form className="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(160px,240px)_180px_auto]"><input type="hidden" name="view" value={view}/><input name="q" defaultValue={q} placeholder="Search leads or companies" aria-label="Search leads"/><select name="org" defaultValue={orgFilter} aria-label="Filter by organisation"><option value="">All organisations</option>{organisations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select><button className="button">Filter</button></form>
-        <div className="flex items-center gap-1 rounded-md bg-neutral-100 p-1"><Link className={`rounded-md px-2.5 py-1 text-xs font-medium ${view === "board" ? "bg-white text-neutral-900 shadow-xs" : "text-neutral-600 hover:bg-neutral-100"}`} href={viewHref("board")}>Board</Link><Link className={`rounded-md px-2.5 py-1 text-xs font-medium ${view === "list" ? "bg-white text-neutral-900 shadow-xs" : "text-neutral-600 hover:bg-neutral-100"}`} href={viewHref("list")}>List</Link></div>
-    </div>
-
-    {leads.length === 0 ? (
-      <div className="panel p-12 text-center">
-        <h2 className="font-semibold text-neutral-800">{q || orgFilter ? "No leads match your filters" : "No leads yet"}</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500">{newLeadOrgs.length > 0 ? "Add your first lead and it will appear in its pipeline stage." : organisations.length === 0 ? "You aren't a member of any organisation yet. An administrator needs to invite you before you can see leads." : "You have read-only access in this workspace. Ask an administrator for a role that can add leads."}</p>
-        {newLeadOrgs.length > 0 && !q && !orgFilter && <p className="mt-4 text-sm text-neutral-500">Select Add lead to start an opportunity.</p>}
-      </div>
-    ) : view === "list" ? (
-      <div className="panel overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-neutral-500 border-b"><tr><th className="p-4">Lead</th><th>Company</th><th>Stage</th><th>Value</th><th>Owner</th><th>Organisation</th></tr></thead><tbody>{leads.map((lead) => <tr key={lead.id} className="border-b last:border-0 hover:bg-neutral-50"><td className="p-4 font-medium"><Link className="hover:text-blue-700" href={`/leads/${lead.id}`}>{lead.title}</Link></td><td>{lead.companyName}</td><td>{lead.stage.name}</td><td>{lead.estimatedValue ? `$${lead.estimatedValue.toString()}` : "—"}</td><td>{lead.owner.name}</td><td>{lead.organisation.name}</td></tr>)}</tbody></table></div>
-    ) : (
-      <LeadPipeline boards={boards} />
-    )}
-  </div>;
+import { leadScope,canEditLead,canWriteOrganisation,organisationScope } from "@/lib/permissions";
+import { LeadPipeline,type PipelineBoard } from "@/components/lead-pipeline";
+import { NewLeadButton } from "@/components/new-lead-form";
+import { LeadList } from "@/components/lead-list";
+import { Modal,ModalForm } from "@/components/modal";
+import { Field,PageHeader,EmptyState } from "@/components/crm-ui";
+import { parseLeadFilters,leadFilterWhere,filtersHref,leadFilterSchema } from "@/lib/lead-filters";
+import { saveLeadView,deleteLeadView } from "./view-actions";
+export default async function LeadsPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
+ const user=await currentUser();if(!user)return <WorkspaceGate title="Leads"/>;const params=await searchParams;
+ let filters=parseLeadFilters(params);
+ if(params.saved){const saved=await db.savedView.findFirst({where:{id:params.saved,userId:user.id}});const parsed=leadFilterSchema.safeParse(saved?.filters);if(parsed.success)filters=parsed.data;}
+ const scope=await leadScope(user.id);
+ const [leads,organisations,savedViews]=await Promise.all([db.lead.findMany({where:{AND:[scope,...leadFilterWhere(filters,user.id)]},include:{owner:{select:{name:true}},stage:{select:{name:true}},organisation:{select:{name:true}}},orderBy:{updatedAt:"desc"}}),db.organisation.findMany({where:await organisationScope(user.id),include:{companies:{select:{id:true,name:true},orderBy:{name:"asc"}},stages:{orderBy:{position:"asc"}},memberships:{where:{role:{not:"VIEWER"},user:{suspended:false}},include:{user:{select:{name:true}}}}},orderBy:{name:"asc"}}),db.savedView.findMany({where:{userId:user.id},orderBy:{createdAt:"asc"}})]);
+ const visibleOrgIds=await db.lead.findMany({where:scope,distinct:["organisationId"],select:{organisationId:true}});
+ const missingOrgIds=visibleOrgIds.map(l=>l.organisationId).filter(id=>!organisations.some(o=>o.id===id));
+ if(missingOrgIds.length)organisations.push(...await db.organisation.findMany({where:{id:{in:missingOrgIds}},include:{companies:{where:{id:{in:[]}},select:{id:true,name:true}},stages:{orderBy:{position:"asc"}},memberships:{where:{userId:user.id},include:{user:{select:{name:true}}}}}}));
+ const editMap=new Map((await Promise.all(leads.map(async l=>[l.id,await canEditLead(user.id,l.id)] as const))));
+ const creatable=(await Promise.all(organisations.map(async o=>await canWriteOrganisation(user.id,o.id)?o:null))).filter(o=>o!==null);
+ const boards:PipelineBoard[]=organisations.filter(o=>!filters.org||o.id===filters.org).map(org=>({organisationId:org.id,organisationName:org.name,stages:org.stages.filter(s=>(!filters.stage||s.id===filters.stage)&&(filters.closed==="show"||!["Won","Lost"].includes(s.name))).map(s=>({id:s.id,name:s.name})),leads:leads.filter(l=>l.organisationId===org.id).map(l=>({id:l.id,title:l.title,companyName:l.companyName,value:l.estimatedValue?.toString()??null,currency:l.currency,owner:l.owner.name,editable:!!editMap.get(l.id),stageId:l.stageId}))}));
+ const members=organisations.flatMap(o=>o.memberships.map(m=>({id:m.userId,name:m.user.name,organisationId:o.id})));
+ return <div className="space-y-5"><PageHeader title="Leads" description={`${leads.length} opportunities · ${filters.closed==="hide"?"Open pipeline":"All stages"}`} action={creatable.length>0?<NewLeadButton organisations={creatable.map(o=>({id:o.id,name:o.name,stages:o.stages,companies:o.companies}))}/>:undefined}/>
+ <div className="flex flex-wrap items-center gap-5 border-b text-xs"><Link className={`pb-3 ${filters.mode==="all"?"border-b-2 border-neutral-900 font-medium":"text-neutral-500"}`} href={filtersHref({...filters,mode:"all"})}>All leads</Link><Link className={`pb-3 ${filters.mode==="mine"?"border-b-2 border-neutral-900 font-medium":"text-neutral-500"}`} href={filtersHref({...filters,mode:"mine"})}>My leads</Link><Link className={`pb-3 ${filters.mode==="stale"?"border-b-2 border-neutral-900 font-medium":"text-neutral-500"}`} href={filtersHref({...filters,mode:"stale"})}>Stale · 14+ days</Link>{savedViews.map(v=><Link href={`/leads?saved=${v.id}`} className={`pb-3 ${params.saved===v.id?"font-medium":"text-neutral-500"}`} key={v.id}>{v.name}</Link>)}</div>
+ <div className="flex flex-wrap items-start justify-between gap-3"><form className="grid w-full gap-2 md:w-auto md:grid-cols-[180px_150px_150px_auto]"><input type="hidden" name="view" value={filters.view}/><input type="hidden" name="mode" value={filters.mode}/><input type="hidden" name="closed" value={filters.closed}/><input type="hidden" name="owner" value={filters.owner}/><input name="q" defaultValue={filters.q} aria-label="Search leads" placeholder="Search opportunities…"/><select name="org" defaultValue={filters.org} aria-label="Organisation"><option value="">All organisations</option>{organisations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><select name="stage" defaultValue={filters.stage} aria-label="Stage"><option value="">All stages</option>{organisations.map(o=><optgroup key={o.id} label={o.name}>{o.stages.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup>)}</select><button className="ui-button-secondary">Apply filters</button></form>
+ <div className="flex flex-wrap items-center gap-2"><Link className="text-xs text-neutral-500 hover:underline" href={filtersHref({...filters,closed:filters.closed==="show"?"hide":"show"})}>{filters.closed==="show"?"Hide Won / Lost":"Show Won / Lost"}</Link><div className="flex border">{["board","list"].map(v=><Link key={v} aria-current={filters.view===v?"page":undefined} className={`px-3 py-2 text-xs capitalize ${filters.view===v?"bg-neutral-100 font-medium":"text-neutral-500"}`} href={filtersHref({...filters,view:v as "board"|"list"})}>{v}</Link>)}</div><Modal title="Save this view" trigger="Save view" triggerClassName="ui-button-secondary"><ModalForm action={saveLeadView} submitLabel="Save view"><input type="hidden" name="filters" value={JSON.stringify(filters)}/><Field label="View name" wide><input name="name" required minLength={2} maxLength={60} placeholder="My qualified opportunities"/></Field></ModalForm></Modal>{params.saved&&<form action={deleteLeadView}><input name="id" type="hidden" value={params.saved}/><button className="ui-button-secondary">Remove view</button></form>}</div></div>
+ {leads.length===0?<EmptyState title="No opportunities in this view"><p>Try changing your filters or add a lead to start your pipeline.</p><Link className="mt-3 inline-block underline" href="/leads?closed=show">Reset filters</Link></EmptyState>:filters.view==="list"?<LeadList leads={leads.map(l=>({id:l.id,title:l.title,companyName:l.companyName,organisation:l.organisation.name,organisationId:l.organisationId,stage:l.stage.name,owner:l.owner.name,currency:l.currency,value:l.estimatedValue?.toString()??null,editable:!!editMap.get(l.id)}))} stages={organisations.flatMap(o=>o.stages.map(s=>({id:s.id,name:s.name,organisationId:o.id})))} members={members}/>:<LeadPipeline boards={boards}/>}</div>;
 }

@@ -1,16 +1,9 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight,Eye,EyeOff,Mail,LockKeyhole } from "lucide-react";
 import { createAuthClient } from "better-auth/react";
-const client = createAuthClient();
-export function SignIn() {
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  return <form className="space-y-5" onSubmit={async (event) => { event.preventDefault(); setError(""); setLoading(true); try { const form = new FormData(event.currentTarget); const result = await client.signIn.email({ email: String(form.get("email")), password: String(form.get("password")) }); if (result.error) setError("Unable to sign in. Check your details and try again."); else window.location.assign("/leads"); } catch { setError("The sign-in service is unavailable. Please try again."); } finally { setLoading(false); } }}>
-    <label className="block space-y-2 text-sm font-medium text-neutral-800"><span>Work email</span><input required type="email" name="email" autoComplete="email" placeholder="you@company.com" className="ui-input" /></label>
-    <label className="block space-y-2 text-sm font-medium text-neutral-800"><span>Password</span><span className="relative block"><input required type={showPassword ? "text" : "password"} name="password" autoComplete="current-password" placeholder="Enter your password" className="ui-input pr-11"/><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
-    {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-    <button disabled={loading} className="ui-button mt-2 w-full">{loading ? "Signing in…" : "Sign in"}<ArrowRight size={16}/></button>
-  </form>;
+const client=createAuthClient();
+export function SignIn(){
+ const [error,setError]=useState("");const [loading,setLoading]=useState(false);const [show,setShow]=useState(false);
+ return <form className="space-y-5" onSubmit={async e=>{e.preventDefault();setError("");setLoading(true);try{const data=new FormData(e.currentTarget);const result=await client.signIn.email({email:String(data.get("email")).trim().toLowerCase(),password:String(data.get("password"))});if(result.error)setError("Unable to sign in. Check your email and password.");else window.location.assign("/dashboard");}catch{setError("The sign-in service is unavailable. Please try again.");}finally{setLoading(false);}}}><fieldset disabled={loading} className="space-y-5"><label className="form-field"><span className="field-label">Work email <span className="text-sky-600" aria-hidden="true">*</span></span><span className="field-control"><Mail size={15} className="field-icon"/><input type="email" name="email" autoComplete="email" required placeholder="you@company.com"/></span></label><label className="form-field"><span className="field-label">Password <span className="text-sky-600" aria-hidden="true">*</span></span><span className="field-control"><LockKeyhole size={15} className="field-icon"/><input type={show?"text":"password"} name="password" aria-label="Password" autoComplete="current-password" required placeholder="Enter your password" style={{paddingRight:42}}/><button type="button" onClick={()=>setShow(!show)} aria-label={show?"Hide password":"Show password"} className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-700">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button></span></label>{error&&<p role="alert" className="border-l-2 border-red-500 bg-red-50 p-3 text-xs leading-5 text-red-700">{error}</p>}<button disabled={loading} className="ui-button mt-2 flex w-full justify-between px-4" style={{height:44}}><span>{loading?"Signing in…":"Sign in to workspace"}</span><ArrowRight size={15}/></button></fieldset></form>;
 }

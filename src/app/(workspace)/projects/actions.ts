@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditProject } from "@/lib/permissions";
+import { canEditProject, canEditLead } from "@/lib/permissions";
 
 const statusEnum = z.enum(["PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CANCELLED"]);
 const projectInput = z.object({ name: z.string().trim().min(2).max(160), emoji: z.string().trim().max(8), description: z.string().max(5000), organisationId: z.uuid(), status: statusEnum });
@@ -56,7 +56,7 @@ export async function assignLeadToProject(form: FormData) {
   const project = await db.project.findFirst({ where: { id: projectId, deletedAt: null } });
   if (!project) throw new Error("Invalid project");
   const lead = await db.lead.findFirst({ where: { id: leadId, organisationId: project.organisationId, deletedAt: null } });
-  if (!lead) throw new Error("Invalid lead");
+  if (!lead || !await canEditLead(user.id, leadId)) throw new Error("Invalid lead");
   await db.lead.update({ where: { id: leadId }, data: { projectId } });
   revalidatePath(`/projects/${projectId}`); revalidatePath(`/leads/${leadId}`);
 }
@@ -67,7 +67,7 @@ export async function unassignLeadFromProject(form: FormData) {
   const leadId = z.uuid().parse(form.get("leadId"));
   if (!await canEditProject(user.id, projectId)) throw new Error("Not authorised");
   const lead = await db.lead.findFirst({ where: { id: leadId, projectId, deletedAt: null } });
-  if (!lead) throw new Error("Invalid lead");
+  if (!lead || !await canEditLead(user.id, leadId)) throw new Error("Invalid lead");
   await db.lead.update({ where: { id: leadId }, data: { projectId: null } });
   revalidatePath(`/projects/${projectId}`); revalidatePath(`/leads/${leadId}`);
 }

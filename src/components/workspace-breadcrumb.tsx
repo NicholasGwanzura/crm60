@@ -1,8 +1,3 @@
 "use client";
 import { usePathname } from "next/navigation";
-
-export function WorkspaceBreadcrumb() {
-  const pathname = usePathname();
-  const label = pathname.startsWith("/settings") ? "Settings" : pathname.startsWith("/projects") ? "Projects" : pathname.startsWith("/team") ? "Team" : "Leads";
-  return <div className="flex items-center gap-2 text-sm"><span className="text-neutral-400">Workspace</span><span className="text-neutral-300">/</span><span className="font-medium">{label}</span></div>;
-}
+export function WorkspaceBreadcrumb(){const pathname=usePathname();const labels:Record<string,string>={issues:"Issues",dashboard:"Overview","my-work":"My work",leads:"Leads",companies:"Companies & contacts",quotes:"Quotes & proposals",projects:"Projects",team:"Team",settings:"Settings"};const segments=pathname.split("/").filter(Boolean);return <div className="flex items-center gap-2 text-xs"><span className="text-neutral-400">Workspace</span><span className="text-neutral-300">/</span><span className="font-medium text-neutral-600">{labels[segments[0]]??"Workspace"}</span>{segments.length>1&&<><span className="text-neutral-300">/</span><span className="text-neutral-400">Details</span></>}</div>;}

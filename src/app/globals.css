@@ -44,3 +44,52 @@ button:active:not(:disabled) { transform: translateY(1px); }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   button:active:not(:disabled) { transform: none; }
 }
+
+/* Dense product surfaces and full-height drilldowns. */
+.crm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.crm-table th { padding: 12px 14px; border-bottom: 1px solid #e5e5e5; background: #fafafa; color: #737373; font-size: 11px; font-weight: 500; text-align: left; white-space: nowrap; }
+.crm-table td { padding: 15px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.crm-table tbody tr:hover { background: #fafafa; }
+.crm-table input[type="checkbox"] { width: 14px; height: 14px; accent-color: #262626; }
+.status-tag { display:inline-block; border:1px solid #e5e5e5; background:#fafafa; padding:3px 7px; font-size:10px; color:#525252; white-space:nowrap; }
+.property-control { display:flex; width:100%; align-items:center; border:1px solid #ededed; background:#fafafa; padding:7px 9px; text-align:left; font-size:11px; color:#525252; }
+.property-control:hover { background:#f0f0f0; border-color:#d4d4d4; }
+.pipeline-column { min-height:260px; transition:width 180ms ease, background-color 140ms ease; }
+.record-drawer { position:fixed; inset:0 0 0 auto; margin:0; height:100dvh; max-height:100dvh; width:min(960px,100vw); max-width:100vw; padding:0; border:0; border-left:1px solid #e5e5e5; overflow-y:auto; color:#171717; background:#fff; box-shadow:-12px 0 60px #00000012; }
+.record-drawer::backdrop { background:#00000025; }
+.record-drawer[open] { animation:drawer-enter 200ms ease-out; }
+.drawer-toolbar { position:sticky; top:0; z-index:10; }
+@keyframes drawer-enter { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+@media print {
+ @page { size:A4; margin:16mm; }
+ body { background:white; color:black; }
+ body:has(.quote-document) aside, body:has(.quote-document) header, .no-print { display:none !important; }
+ body:has(.quote-document) main { padding:0; max-width:none; }
+ .quote-document article { border:0; padding:0; }
+ .quote-document table { page-break-inside:auto; }
+ .quote-document tr { page-break-inside:avoid; }
+ .quote-document th { background:#f5f5f5; }
+}
+
+/* Refined fields: persistent labels, restrained icons, generous hit areas. */
+.form-field { display:grid; gap:7px; align-content:start; min-width:0; }
+.field-label { font-size:12px; font-weight:500; color:#525252; letter-spacing:.005em; }
+.field-control { position:relative; display:block; min-width:0; }
+.field-icon { position:absolute; top:13px; left:12px; z-index:1; pointer-events:none; color:#a3a3a3; transition:color 140ms ease; }
+.field-control:focus-within .field-icon { color:#0284c7; }
+.field-hint { font-size:11px; line-height:1.6; color:#a3a3a3; }
+form input:not([type="hidden"]):not([type="checkbox"]), form select, form textarea {
+  min-height:40px; border:1px solid #dedee2; background:#fcfcfd; padding:10px 12px; font-size:13px; line-height:1.4; box-shadow:0 1px 1px #00000003; outline:none;
+}
+form input:not([type="hidden"]):not([type="checkbox"]):hover, form select:hover, form textarea:hover { border-color:#bfc2c7; background:#fff; }
+form input:not([type="hidden"]):not([type="checkbox"]):focus, form select:focus, form textarea:focus { border-color:#0284c7; background:#fff; box-shadow:0 0 0 3px #0284c712; }
+form input:user-invalid, form textarea:user-invalid, form select:user-invalid { border-color:#dc2626; box-shadow:0 0 0 2px #dc26260a; }
+form .field-control > input:not([type="hidden"]), form .field-control > select, form .field-control > textarea { padding-left:36px; }
+form select { appearance:none; padding-right:32px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2385858c' stroke-width='1.6'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
+form textarea { min-height:112px; }
+form input[type="checkbox"] { accent-color:#262626; }
+.workspace-dialog { box-shadow:0 20px 80px #00000020; }
+.workspace-dialog > div:first-child { background:#fafafa; }
+@media(prefers-reduced-motion:reduce) { .pipeline-column,.record-drawer { transition:none !important; animation:none !important; } }
+.crm-table th.text-right { text-align:right; }
+.field-control input[readonly] { background:#f5f5f5; color:#737373; }

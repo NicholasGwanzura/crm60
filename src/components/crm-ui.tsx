@@ -1,0 +1,12 @@
+import { isValidElement } from "react";
+import { Mail,Phone,CalendarDays,Globe,Building2,UserRound,AlignLeft,Type,KeyRound,Flag,CircleDollarSign,Layers3 } from "lucide-react";
+import Link from "next/link";
+export function PageHeader({title,description,action}:{title:string;description:string;action?:React.ReactNode}){return <header className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-xl font-semibold tracking-tight">{title}</h1><p className="mt-1 text-sm text-neutral-500">{description}</p></div>{action}</header>;}
+export function EmptyState({title,children}:{title:string;children?:React.ReactNode}){return <div className="border-y py-16 text-center"><h2 className="text-sm font-medium">{title}</h2><div className="mx-auto mt-2 max-w-md text-sm leading-6 text-neutral-500">{children}</div></div>;}
+export function RecordLink({href,children}:{href:string;children:React.ReactNode}){return <Link className="font-medium text-neutral-900 underline-offset-4 hover:underline" href={href}>{children}</Link>;}
+export function Field({label,children,wide=false,hint}:{label:string;children:React.ReactNode;wide?:boolean;hint?:string}){
+ const required=isValidElement<{required?:boolean}>(children)&&children.props.required;
+ const Icon=/email/i.test(label)?Mail:/phone/i.test(label)?Phone:/date|through/i.test(label)?CalendarDays:/website|country/i.test(label)?Globe:/organisation|company/i.test(label)?Building2:/owner|assigned|contact|name/i.test(label)?UserRound:/description|about|notes|terms|conversation/i.test(label)?AlignLeft:/password|key/i.test(label)?KeyRound:/priority|status|stage/i.test(label)?Flag:/value|currency|price|tax|quantity/i.test(label)?CircleDollarSign:/project|lead|model/i.test(label)?Layers3:Type;
+ return <label className={`form-field ${wide?"sm:col-span-2":""}`}><span className="field-label">{label}{required&&<span className="ml-1 text-sky-600" aria-hidden="true">*</span>}</span><span className="field-control"><Icon size={15} className="field-icon" aria-hidden="true"/>{children}</span>{hint&&<span className="field-hint">{hint}</span>}</label>;
+}
+export function Stat({label,value,hint}:{label:string;value:React.ReactNode;hint?:string}){return <div className="border-l pl-5"><p className="text-xs text-neutral-500">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>{hint&&<p className="mt-1 text-xs text-neutral-400">{hint}</p>}</div>;}

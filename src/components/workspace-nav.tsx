@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderKanban, Layers3, Users, Settings2 } from "lucide-react";
-export function WorkspaceNav({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
-  const pathname = usePathname();
-  const items = [{ href: "/leads", name: "Leads", icon: Layers3 }, { href: "/projects", name: "Projects", icon: FolderKanban }, ...(signedIn ? [{ href: "/team", name: "Team", icon: Users }] : []), ...(isAdmin ? [{ href: "/settings", name: "Settings", icon: Settings2 }] : [])];
-  return <nav aria-label="Main navigation" className="flex gap-1 px-3 pb-3 md:block md:space-y-1">{items.map(({ href, name, icon: Icon }) => <Link key={href} href={href} aria-current={pathname.startsWith(href) ? "page" : undefined} className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors ${pathname.startsWith(href) ? "bg-neutral-200/60 text-neutral-950" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"}`}><Icon size={16}/>{name}</Link>)}</nav>;
+import { FolderKanban,Layers3,Users,Settings2,ChartNoAxesCombined,ListTodo,Building2,FileText,Bug } from "lucide-react";
+export function WorkspaceNav({signedIn,isAdmin,overdue=0}:{signedIn:boolean;isAdmin:boolean;overdue?:number}){
+ const pathname=usePathname();
+ const groups=[{label:"Workspace",items:[...(signedIn?[{href:"/dashboard",name:"Overview",icon:ChartNoAxesCombined},{href:"/my-work",name:"My work",icon:ListTodo}]:[]),{href:"/leads",name:"Leads",icon:Layers3},...(signedIn?[{href:"/companies",name:"Companies",icon:Building2},{href:"/quotes",name:"Quotes",icon:FileText}]:[]),{href:"/projects",name:"Projects",icon:FolderKanban},...(signedIn?[{href:"/issues",name:"Issues",icon:Bug}]:[])]},{label:"Manage",items:[...(signedIn?[{href:"/team",name:"Team",icon:Users}]:[]),...(isAdmin?[{href:"/settings",name:"Settings",icon:Settings2}]:[])]}];
+ return <nav aria-label="Main navigation" className="flex overflow-x-auto px-3 pb-3 md:block md:space-y-6">{groups.filter(g=>g.items.length).map(group=><div key={group.label} className="flex gap-1 md:block md:space-y-1"><p className="hidden px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-400 md:block">{group.label}</p>{group.items.map(({href,name,icon:Icon})=><Link key={href} href={href} aria-current={pathname.startsWith(href)?"page":undefined} className={`flex shrink-0 items-center gap-2.5 border-l-2 px-3 py-2 text-[13px] transition-colors ${pathname.startsWith(href)?"border-neutral-900 bg-neutral-200/45 font-medium text-neutral-950":"border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"}`}><Icon size={15}/><span className="flex-1">{name}</span>{href==="/my-work"&&overdue>0&&<span className="bg-red-50 px-1.5 text-[10px] text-red-700">{overdue}</span>}</Link>)}</div>)}</nav>;
 }

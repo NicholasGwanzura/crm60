@@ -1,0 +1,18 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { organisationScope, leadScope, canWriteOrganisation } from "@/lib/permissions";
+import { CompanyForm, ContactForm } from "@/components/company-forms";
+import { PageHeader, EmptyState } from "@/components/crm-ui";
+import { money, date } from "@/lib/crm-format";
+export default async function CompanyPage({params}:{params:Promise<{id:string}>}){
+ const user=await requireUser();const {id}=await params;const ls=await leadScope(user.id);
+ const company=await db.company.findFirst({where:{id,organisation:await organisationScope(user.id)},include:{contacts:{orderBy:{name:"asc"}},organisation:true,leads:{where:ls,include:{stage:true,notes:{take:3,orderBy:{createdAt:"desc"},include:{author:{select:{name:true}}}}},orderBy:{updatedAt:"desc"}}}});
+ if(!company)notFound();const editable=await canWriteOrganisation(user.id,company.organisationId);
+ const conversations=company.leads.flatMap(l=>l.notes.map(n=>({...n,leadTitle:l.title,leadId:l.id}))).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()).slice(0,15);
+ return <><Link className="mb-5 block text-xs text-neutral-500 hover:underline" href="/companies">← Companies</Link><PageHeader title={company.name} description={`${company.organisation.name}${company.industry?` · ${company.industry}`:""}`} action={editable?<CompanyForm organisations={[]} company={company}/>:undefined}/><div className="mb-8 grid gap-4 border-y py-5 text-sm md:grid-cols-2"><p className="whitespace-pre-wrap leading-6 text-neutral-600">{company.description||"No company description yet."}</p>{company.website&&<a href={company.website} target="_blank" rel="noreferrer" className="text-neutral-500 underline">{company.website}</a>}</div>
+ <div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-semibold">Contacts · {company.contacts.length}</h2>{editable&&<ContactForm companyId={id}/>}</div>{company.contacts.length===0?<EmptyState title="No contacts yet">Add the people you work with at this company.</EmptyState>:<div className="mb-8 grid gap-0 divide-y border-y">{company.contacts.map(c=><div key={c.id} className="flex flex-wrap items-center gap-4 py-4"><div className="flex-1"><p className="text-sm font-medium">{c.name}</p><p className="mt-1 text-xs text-neutral-500">{c.jobTitle||"Contact"}</p></div><div className="text-xs text-neutral-500">{c.email&&<a className="block hover:underline" href={`mailto:${c.email}`}>{c.email}</a>}{c.phone&&<a className="mt-1 block hover:underline" href={`tel:${c.phone}`}>{c.phone}</a>}</div>{editable&&<ContactForm companyId={id} contact={c}/>}</div>)}</div>}
+ <h2 className="mb-4 mt-8 text-sm font-semibold">Opportunities · {company.leads.length}</h2><div className="overflow-x-auto"><table className="crm-table"><thead><tr><th>Lead</th><th>Stage</th><th>Value</th></tr></thead><tbody>{company.leads.map(l=><tr key={l.id}><td><Link href={`/leads/${l.id}`} className="font-medium hover:underline">{l.title}</Link></td><td>{l.stage.name}</td><td>{l.estimatedValue?money(l.estimatedValue.toString(),l.currency):"—"}</td></tr>)}</tbody></table></div>
+ <h2 className="mb-4 mt-8 text-sm font-semibold">Conversation history</h2>{conversations.length===0?<p className="text-sm text-neutral-500">Notes from linked leads will appear here.</p>:conversations.map(n=><article className="border-t py-4" key={n.id}><p className="whitespace-pre-wrap text-sm leading-6">{n.body}</p><p className="mt-2 text-xs text-neutral-500">{n.author.name} · {date(n.createdAt)} · <Link className="hover:underline" href={`/leads/${n.leadId}?tab=notes`}>{n.leadTitle}</Link></p></article>)}</>;
+}

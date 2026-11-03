@@ -1,38 +1,12 @@
 "use client";
-import { Modal, ModalForm } from "@/components/modal";
+import { Modal,ModalForm } from "@/components/modal";
+import { Field } from "@/components/crm-ui";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { createLead } from "@/app/(workspace)/leads/actions";
-
-export type NewLeadOrg = { id: string; name: string; stages: { id: string; name: string }[] };
-
-export function NewLeadForm({ organisations }: { organisations: NewLeadOrg[] }) {
-  const [orgId, setOrgId] = useState(organisations[0]?.id ?? "");
-  const org = organisations.find((o) => o.id === orgId) ?? organisations[0];
-
-  if (!org) return null;
-
-  return (
-    <ModalForm action={createLead} submitLabel="Create lead">
-      <label className="block space-y-1.5 text-sm">
-        <span className="font-medium text-neutral-700">Organisation</span>
-        <select name="organisationId" value={orgId} onChange={(e) => setOrgId(e.target.value)} aria-label="Organisation">
-          {organisations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm">
-        <span className="font-medium text-neutral-700">Stage</span>
-        <select key={org.id} name="stageId" defaultValue={org.stages[0]?.id} aria-label="Stage" required>
-          {org.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </label>
-      <input name="title" required minLength={2} placeholder="Lead title" aria-label="Lead title" />
-      <input name="companyName" required minLength={2} placeholder="Company name" aria-label="Company name" />
-      <input name="email" type="email" placeholder="Email" aria-label="Email" />
-      <textarea name="description" placeholder="Description" aria-label="Description" className="md:col-span-2" />
-
-    </ModalForm>
-  );
+export type NewLeadOrg={id:string;name:string;stages:{id:string;name:string}[];companies?:{id:string;name:string}[]};
+export function NewLeadForm({organisations}:{organisations:NewLeadOrg[]}){
+ const [orgId,setOrgId]=useState(organisations[0]?.id??"");const [companyId,setCompanyId]=useState("");const org=organisations.find(o=>o.id===orgId)??organisations[0];if(!org)return null;const company=org.companies?.find(c=>c.id===companyId);
+ return <ModalForm action={createLead} submitLabel="Create opportunity"><Field label="Opportunity title" wide hint="Give your team a clear, recognisable opportunity name."><input name="title" required minLength={2} maxLength={160} placeholder="e.g. Property management platform"/></Field><Field label="Organisation"><select name="organisationId" value={orgId} onChange={e=>{setOrgId(e.target.value);setCompanyId("");}} required>{organisations.map(o=><option value={o.id} key={o.id}>{o.name}</option>)}</select></Field><Field label="Pipeline stage"><select key={org.id} name="stageId" required defaultValue={org.stages[0]?.id}>{org.stages.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field><Field label="Company profile" wide hint="Choose an existing customer or enter a new company below."><select name="companyId" value={companyId} onChange={e=>setCompanyId(e.target.value)}><option value="">New / unlinked company</option>{org.companies?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Company name"><input key={companyId} name="companyName" required minLength={2} maxLength={160} defaultValue={company?.name??""} readOnly={!!company} placeholder="e.g. Zimre Properties"/></Field><Field label="Contact email"><input name="email" type="email" placeholder="name@company.com"/></Field><Field label="Opportunity details" wide hint="Capture the need, scope, or context from your first conversation."><textarea name="description" maxLength={5000} rows={4} placeholder="What is the customer looking to achieve?"/></Field></ModalForm>;
 }
-
-export function NewLeadButton({ organisations }: { organisations: NewLeadOrg[] }) { return <Modal title="Add lead" description="Start a new opportunity in your pipeline." trigger={<><Plus size={15}/> Add lead</>} triggerClassName="ui-button"><NewLeadForm organisations={organisations}/></Modal>; }
+export function NewLeadButton({organisations}:{organisations:NewLeadOrg[]}){return <Modal title="New opportunity" description="Start with the essentials. You can add contacts, value, and follow-ups next." trigger={<><Plus size={14}/> Add lead</>} triggerClassName="ui-button"><NewLeadForm organisations={organisations}/></Modal>;}

@@ -1,0 +1,8 @@
+import { expect,it } from "vitest";
+import {quoteTotals,decimalUnits,stageKind} from "@/lib/crm-format";
+import {quoteInput} from "@/lib/quote-input";
+import {parseLeadFilters,leadFilterWhere} from "@/lib/lead-filters";
+it("rounds line amounts and tax once using exact decimal arithmetic",()=>{expect(quoteTotals([{quantity:"3",unitPrice:"0.10"},{quantity:"1.25",unitPrice:"19.99"}],"15")).toEqual({lines:["0.30","24.99"],subtotal:"25.29",tax:"3.79",total:"29.08"});});
+it("handles fractional quantities and free line items",()=>{expect(quoteTotals([{quantity:"0.5",unitPrice:"0.01"},{quantity:"1",unitPrice:"0"}],"0").total).toBe("0.01");expect(decimalUnits("0.01")).toBe(BigInt(1));});
+it("rejects invalid quotes, negative prices, malformed dates, and excessive tax",()=>{const valid={title:"Quote",currency:"USD",taxRate:"15",notes:"",validUntil:"2026-11-30",items:[{description:"Service",quantity:"1",unitPrice:"100"}]};expect(quoteInput.safeParse(valid).success).toBe(true);for(const invalid of [{taxRate:"101"},{validUntil:"2026-02-30"},{items:[{description:"Service",quantity:"1",unitPrice:"-1"}]},{items:[]}])expect(quoteInput.safeParse({...valid,...invalid}).success).toBe(false);});
+it("keeps owner and stale filters in addition to the caller's access scope",()=>{const filters=parseLeadFilters({mode:"mine",org:"org",view:"list"});expect(leadFilterWhere(filters,"me")).toContainEqual({ownerId:"me"});expect(leadFilterWhere(filters,"me")).toContainEqual({organisationId:"org"});expect(leadFilterWhere(parseLeadFilters({mode:"stale"}),"me",new Date("2026-11-03T00:00:00Z"))).toContainEqual({updatedAt:{lte:new Date("2026-10-20T00:00:00Z")},stage:{name:{notIn:["Won","Lost"]}}});expect(stageKind("Won")).toBe("won");});

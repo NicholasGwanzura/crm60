@@ -1,85 +1,26 @@
 "use client";
-import { useState, useTransition } from "react";
-import { Modal } from "@/components/modal";
+import { useState,useTransition } from "react";
 import Link from "next/link";
-import { moveLeadStage, changeLeadStage } from "@/app/(workspace)/leads/actions";
-
-export type PipelineLead = {
-  id: string;
-  title: string;
-  companyName: string;
-  value: string | null;
-  owner: string;
-  editable: boolean;
-  stageId: string;
-};
-export type PipelineStage = { id: string; name: string };
-export type PipelineBoard = { organisationId: string; organisationName: string; stages: PipelineStage[]; leads: PipelineLead[] };
-
-export function LeadPipeline({ boards }: { boards: PipelineBoard[] }) {
-  return <div className="space-y-8">{boards.map((board) => <Board key={board.organisationId} board={board} />)}</div>;
-}
-
-function Board({ board }: { board: PipelineBoard }) {
-  const [isPending, startTransition] = useTransition();
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-
-  const drop = (stageId: string) => (event: React.DragEvent) => {
-    event.preventDefault();
-    const leadId = event.dataTransfer.getData("text/plain");
-    setDraggingId(null);
-    if (!leadId) return;
-    const lead = board.leads.find((l) => l.id === leadId);
-    if (!lead || !lead.editable || lead.stageId === stageId) return;
-    setError("");
-    startTransition(async () => {
-      try { await moveLeadStage(leadId, stageId); }
-      catch { setError("Could not move the lead. It may no longer be editable."); }
-    });
-  };
-
-  return (
-    <section className="min-w-0">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="font-semibold text-neutral-900">{board.organisationName}</h2>
-        <span className="text-xs text-neutral-500">{board.leads.length} leads</span>
-      </div>
-      {error && <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {board.stages.map((stage) => {
-          const leads = board.leads.filter((l) => l.stageId === stage.id);
-          return (
-            <div key={stage.id} onDragOver={(e) => e.preventDefault()} onDrop={drop(stage.id)} className="w-64 shrink-0 rounded-lg bg-neutral-50">
-              <div className="flex items-center justify-between px-3 py-3">
-                <span className="text-sm font-medium text-neutral-800">{stage.name}</span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs text-neutral-500">{leads.length}</span>
-              </div>
-              <div className="space-y-2 p-2">
-                {leads.map((lead) => (
-                  <div key={lead.id} className={`rounded-md border border-neutral-200 bg-white shadow-xs transition-opacity ${draggingId === lead.id ? "opacity-40" : ""} ${isPending ? "opacity-60" : ""}`}>
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      draggable={lead.editable}
-                      onDragStart={(e) => { e.dataTransfer.setData("text/plain", lead.id); e.dataTransfer.effectAllowed = "move"; setDraggingId(lead.id); }}
-                      onDragEnd={() => setDraggingId(null)}
-                      className={`block p-3 pb-1 hover:bg-neutral-50 ${lead.editable ? "cursor-grab" : "cursor-pointer"}`}
-                    >
-                      <p className="text-sm font-medium text-neutral-900">{lead.title}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">{lead.companyName}</p>
-                    </Link>
-                    <div className="px-3 pb-1"><Modal title={lead.title} description={lead.companyName} trigger="Quick view" triggerClassName="text-[11px] text-neutral-400 hover:text-neutral-800"><dl className="mb-6 grid grid-cols-2 gap-5 text-sm"><div><dt className="mb-1 text-xs text-neutral-400">Stage</dt><dd>{stage.name}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Owner</dt><dd>{lead.owner}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Estimated value</dt><dd>{lead.value ? `$${lead.value}` : "Not set"}</dd></div><div><dt className="mb-1 text-xs text-neutral-400">Organisation / project</dt><dd>{board.organisationName}</dd></div></dl><Link href={`/leads/${lead.id}`} className="ui-button w-full">Open lead details →</Link></Modal></div><div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
-                      {lead.value ? <span className="text-xs font-medium text-neutral-700">${lead.value}</span> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
-                      {lead.editable ? <form action={changeLeadStage} className="shrink-0"><input type="hidden" name="id" value={lead.id} /><select name="stageId" defaultValue={lead.stageId} onChange={(e) => e.currentTarget.form?.requestSubmit()} aria-label={`Move ${lead.title}`} className="rounded border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-700 outline-none hover:border-neutral-300">{board.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></form> : <span className="text-xs text-neutral-400">{lead.owner}</span>}
-                    </div>
-                  </div>
-                ))}
-                {!leads.length && <p className="rounded-md border border-dashed border-neutral-200 px-3 py-6 text-center text-xs text-neutral-400">No leads in this stage</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+import { ArrowUpRight, ChevronDown, GripVertical } from "lucide-react";
+import { moveLeadStage } from "@/app/(workspace)/leads/actions";
+import { Modal,ModalForm } from "@/components/modal";
+import { changeLeadStage } from "@/app/(workspace)/leads/actions";
+import { money,stageKind } from "@/lib/crm-format";
+export type PipelineLead={id:string;title:string;companyName:string;value:string|null;currency:string;owner:string;editable:boolean;stageId:string};
+export type PipelineStage={id:string;name:string};
+export type PipelineBoard={organisationId:string;organisationName:string;stages:PipelineStage[];leads:PipelineLead[]};
+export function LeadPipeline({boards}:{boards:PipelineBoard[]}){return <div className="space-y-8">{boards.map(board=><Board key={board.organisationId} board={board}/>)}</div>;}
+function Board({board}:{board:PipelineBoard}){
+ const [expanded,setExpanded]=useState<string[]>([]);const [dragging,setDragging]=useState<string|null>(null);const [error,setError]=useState("");const [pending,start]=useTransition();
+ const colors=["bg-neutral-400","bg-sky-500","bg-indigo-400","bg-amber-500","bg-violet-400","bg-orange-400"];
+ function drop(stageId:string){return (e:React.DragEvent)=>{e.preventDefault();const id=e.dataTransfer.getData("text/plain");const lead=board.leads.find(l=>l.id===id);setDragging(null);if(!lead?.editable||lead.stageId===stageId||pending)return;setError("");start(async()=>{try{await moveLeadStage(id,stageId);}catch{setError("Could not move the lead. Check your access and try again.");}});};}
+ function column(stage:PipelineStage,index:number){const leads=board.leads.filter(l=>l.stageId===stage.id);const collapsed=leads.length===0&&!expanded.includes(stage.id);
+ return <div key={stage.id} onDragOver={e=>e.preventDefault()} onDrop={drop(stage.id)} className={`pipeline-column ${collapsed?"w-11":"w-64"} shrink-0 bg-neutral-50/70`}>
+ {collapsed?<button type="button" aria-label={`Expand ${stage.name}`} onClick={()=>setExpanded([...expanded,stage.id])} className="flex h-full min-h-48 w-full flex-col items-center gap-3 px-2 py-4 text-xs text-neutral-500 hover:bg-neutral-100"><span className={`size-1.5 ${colors[index%colors.length]}`}/><span style={{writingMode:"vertical-rl"}}>{stage.name}</span><span className="text-neutral-300">0</span></button>:<><div className="flex items-center gap-2 px-3 py-3"><span className={`size-1.5 ${stageKind(stage.name)==="won"?"bg-emerald-500":stageKind(stage.name)==="lost"?"bg-red-400":colors[index%colors.length]}`}/><h3 className="flex-1 text-xs font-medium">{stage.name}</h3><span className="text-[11px] tabular-nums text-neutral-400">{leads.length}</span>{leads.length===0&&<button aria-label={`Collapse ${stage.name}`} className="text-neutral-400" onClick={()=>setExpanded(expanded.filter(id=>id!==stage.id))}>−</button>}</div><div className="space-y-2 px-2 pb-2">{leads.map(lead=><article draggable={lead.editable&&!pending} onDragStart={e=>{e.dataTransfer.setData("text/plain",lead.id);setDragging(lead.id);}} onDragEnd={()=>setDragging(null)} key={lead.id} className={`group border bg-white p-3 transition-shadow hover:shadow-sm ${dragging===lead.id?"opacity-40":""}`}>
+ <div className="flex items-start gap-2"><Link scroll={false} href={`/leads/${lead.id}`} className="flex-1 text-[13px] font-medium leading-5 hover:underline">{lead.title}</Link>{lead.editable&&<GripVertical size={13} className="mt-1 shrink-0 text-neutral-300"/>}</div><p className="mt-1 text-xs text-neutral-500">{lead.companyName}</p><div className="mt-4 flex items-center justify-between gap-2"><span className="text-xs tabular-nums text-neutral-600">{lead.value?money(lead.value,lead.currency):"No value set"}</span><span title={lead.owner} className="grid size-5 place-items-center bg-neutral-100 text-[9px] font-medium text-neutral-500">{lead.owner.slice(0,2).toUpperCase()}</span></div>
+ {lead.editable&&<div className="mt-3 border-t pt-2"><Modal title={`Move ${lead.title}`} trigger={<span className="flex items-center gap-1">{stage.name}<ChevronDown size={10}/></span>} triggerClassName="text-[10px] text-neutral-400 hover:text-neutral-800"><ModalForm action={changeLeadStage} submitLabel="Move lead"><input type="hidden" name="id" value={lead.id}/><label className="grid gap-2 text-sm sm:col-span-2">Stage<select name="stageId" defaultValue={stage.id}>{board.stages.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></label></ModalForm></Modal></div>}
+ </article>)}{!leads.length&&<Link href="/leads?view=list" className="flex min-h-28 items-center justify-center gap-1 text-xs text-neutral-400 hover:text-neutral-700">Empty stage <ArrowUpRight size={12}/></Link>}</div></>}
+ </div>;}
+ const open=board.stages.filter(s=>stageKind(s.name)==="open");const closed=board.stages.filter(s=>stageKind(s.name)!=="open");
+ return <section><div className="mb-3 flex items-center justify-between"><h2 className="text-xs font-medium text-neutral-500">{board.organisationName}</h2><span className="text-[11px] text-neutral-400">{board.leads.length} {board.leads.length===1?"lead":"leads"} · Drag to move</span></div>{error&&<p role="alert" className="mb-3 text-xs text-red-700">{error}</p>}<div aria-busy={pending} className="flex gap-2 overflow-x-auto pb-3">{open.map(column)}</div>{closed.length>0&&<details className="mt-3 border-t pt-3"><summary className="cursor-pointer text-xs text-neutral-500">Closed outcomes · {board.leads.filter(l=>closed.some(s=>s.id===l.stageId)).length}</summary><div className="mt-3 flex gap-2 overflow-x-auto pb-3">{closed.map(column)}</div></details>}</section>;
 }

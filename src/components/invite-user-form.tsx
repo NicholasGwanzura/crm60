@@ -1,4 +1,5 @@
 "use client";
+import { Field } from "@/components/crm-ui";
 import { useState } from "react";
 import { Copy, UserPlus } from "lucide-react";
 import { createInvitation } from "@/app/(workspace)/team/actions";
@@ -20,9 +21,9 @@ export function InviteUserForm({ organisations }: { organisations: InviteOrg[] }
   return (
     <div className="space-y-4">
       <form className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end" onSubmit={async (e) => { e.preventDefault(); setBusy(true); setResult(null); const fd = new FormData(e.currentTarget); try { setResult(await createInvitation(fd)); } catch { setResult({ error: "Could not create the invitation. Please try again." }); } setBusy(false); }}>
-        <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Email</span><input name="email" type="email" required placeholder="teammate@company.com" /></label>
-        <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Organisation</span><select name="organisationId" value={orgId} onChange={(e) => setOrgId(e.target.value)}>{organisations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
-        <label className="block space-y-1.5 text-sm"><span className="font-medium text-neutral-700">Role</span><select name="role">{roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select></label>
+        <Field label="Email"><input name="email" type="email" required placeholder="teammate@company.com" /></Field>
+        <Field label="Organisation"><select name="organisationId" value={orgId} onChange={(e) => setOrgId(e.target.value)}>{organisations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
+        <Field label="Role"><select name="role">{roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select></Field>
         <button disabled={busy} className="button"><UserPlus size={15} /> {busy ? "Inviting…" : "Invite"}</button>
       </form>
 

@@ -14,7 +14,10 @@ export async function createLead(form: FormData) {
   const member = await db.organisationMembership.findFirst({ where: { userId: user.id, organisationId: input.organisationId, role: { not: "VIEWER" } } });
   const stage = await db.leadStage.findFirst({ where: { id: input.stageId, organisationId: input.organisationId } });
   if (!member || !stage) throw new Error("Not authorised");
-  const lead = await db.lead.create({ data: { title: input.title, companyName: input.companyName, email: input.email || null, description: input.description, organisationId: input.organisationId, ownerId: user.id, stageId: stage.id, activities: { create: { kind: "SYSTEM", description: "Lead created", actorId: user.id } } } });
+  const companyId=form.get("companyId")?z.uuid().parse(form.get("companyId")):null;
+  const company=companyId?await db.company.findFirst({where:{id:companyId,organisationId:input.organisationId}}):null;
+  if(companyId&&!company)throw new Error("Invalid company");
+  const lead = await db.lead.create({ data: { title: input.title, companyName: company?.name ?? input.companyName, companyId, email: input.email || null, description: input.description, organisationId: input.organisationId, ownerId: user.id, stageId: stage.id, activities: { create: { kind: "SYSTEM", description: "Lead created", actorId: user.id } } } });
   revalidatePath("/leads"); redirect(`/leads/${lead.id}`);
 }
 
@@ -24,7 +27,7 @@ async function applyStageChange(userId: string, leadId: string, stageId: string)
   const stage = await db.leadStage.findFirst({ where: { id: stageId, organisationId: lead.organisationId } });
   if (!stage) throw new Error("Invalid stage");
   if (lead.stageId === stageId) return;
-  await db.$transaction([db.lead.update({ where: { id: leadId }, data: { stageId } }), db.activity.create({ data: { leadId, actorId: userId, kind: "STAGE_CHANGE", description: `${lead.stage.name} → ${stage.name}` } })]);
+  await db.$transaction([db.lead.update({ where: { id: leadId }, data: { stageId, stageChangedAt: new Date() } }), db.activity.create({ data: { leadId, actorId: userId, kind: "STAGE_CHANGE", description: `${lead.stage.name} → ${stage.name}` } })]);
   revalidatePath(`/leads/${leadId}`); revalidatePath("/leads");
 }
 
@@ -63,7 +66,8 @@ const leadUpdate = z.object({
   phone: z.string().trim().max(60),
   description: z.string().max(5000),
   country: z.string().trim().min(1).max(100),
-  currency: z.string().trim().min(3).max(3),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/),
+  expectedCloseAt: z.union([z.iso.date(),z.literal("")]),
   estimatedValue: z.string().trim().max(30),
 });
 
@@ -72,9 +76,12 @@ export async function updateLead(form: FormData) {
   const id = z.uuid().parse(form.get("id"));
   if (!await canEditLead(user.id, id)) throw new Error("Not authorised");
   const input = leadUpdate.parse(Object.fromEntries(form));
-  const estimatedValue = input.estimatedValue ? z.coerce.number().positive().parse(input.estimatedValue) : null;
+  const estimatedValue = input.estimatedValue ? z.string().regex(/^\d{1,13}(\.\d{1,2})?$/).parse(input.estimatedValue) : null;
+  const expectedCloseAt = input.expectedCloseAt ? new Date(`${input.expectedCloseAt}T12:00:00+02:00`) : null;
+  if(expectedCloseAt && !Number.isFinite(expectedCloseAt.getTime())) throw new Error("Invalid close date");
+  const linked = await db.lead.findUnique({where:{id},select:{company:{select:{name:true}}}});
   await db.$transaction([
-    db.lead.update({ where: { id }, data: { title: input.title, companyName: input.companyName, email: input.email || null, phone: input.phone || null, description: input.description || null, country: input.country || "Zimbabwe", currency: input.currency || "USD", estimatedValue } }),
+    db.lead.update({ where: { id }, data: { title: input.title, companyName: linked?.company?.name ?? input.companyName, email: input.email || null, phone: input.phone || null, description: input.description || null, country: input.country || "Zimbabwe", currency: input.currency || "USD", estimatedValue, expectedCloseAt } }),
     db.activity.create({ data: { leadId: id, actorId: user.id, kind: "SYSTEM", description: "Lead updated" } }),
   ]);
   revalidatePath(`/leads/${id}`); revalidatePath("/leads");

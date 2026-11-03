@@ -1,26 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { ArrowUpRight,Layers3 } from "lucide-react";
 import { currentUser } from "@/lib/auth";
 import { SignIn } from "@/components/sign-in";
-
-export default async function SignInPage() {
-  const user = await currentUser();
-  if (user) redirect("/leads");
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#fafafa] p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-neutral-900 text-white"><Sparkles size={16} /></span>
-          <span className="text-sm font-semibold tracking-tight">Spiritus <span className="text-neutral-400">×</span> Velocity</span>
-        </div>
-        <div className="ui-card p-6">
-          <h1 className="mb-1 text-lg font-semibold tracking-tight">Sign in</h1>
-          <p className="mb-5 text-sm text-neutral-500">Use your work email and password.</p>
-          <SignIn />
-        </div>
-        <p className="mt-4 text-center text-xs text-neutral-400"><Link className="hover:underline" href="/leads">← Back to workspace preview</Link></p>
-      </div>
-    </div>
-  );
+export default async function SignInPage(){
+ if(await currentUser())redirect("/dashboard");
+ return <main className="grid min-h-dvh bg-white lg:grid-cols-2"><section className="relative flex min-h-dvh flex-col px-7 py-8 sm:px-12 lg:px-16 xl:px-24"><div className="flex items-center gap-2.5"><span className="grid size-8 place-items-center bg-neutral-950 text-white"><Layers3 size={16}/></span><span className="text-sm font-semibold tracking-tight">Spiritus <span className="font-normal text-neutral-400">×</span> Velocity</span></div><div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-14"><div className="mb-9"><p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-neutral-400">Your workspace, connected</p><h1 className="text-3xl font-semibold tracking-tight text-neutral-950">Welcome back.</h1><p className="mt-3 text-sm leading-6 text-neutral-500">Sign in to move your opportunities forward.</p></div><SignIn/><div className="mt-8 border-t pt-5 text-xs leading-6 text-neutral-400">Need workspace access? Ask your administrator for an invitation.</div></div><p className="text-[10px] tracking-wide text-neutral-400">SPIRITUS SYSTEMS × VELOCITY AFRICA</p></section><section aria-label="Connected technology workspace" className="relative hidden min-h-dvh overflow-hidden bg-[#081116] lg:flex lg:flex-col lg:justify-between"><img src="/images/workspace-tech.webp" alt="Glass and metal towers connected by fine cyan light paths" className="absolute inset-0 h-full w-full object-cover"/><div className="absolute inset-0 bg-linear-to-b from-black/25 via-transparent to-black/65"/><div className="relative flex items-center justify-between p-10 text-[10px] uppercase tracking-[0.18em] text-white/60"><span>One connected workspace</span><ArrowUpRight size={16}/></div><div className="relative p-10 xl:p-14"><p className="mb-4 text-[10px] uppercase tracking-[0.2em] text-cyan-200/70">Clarity. Momentum. Delivery.</p><h2 className="max-w-md text-4xl font-medium leading-[1.15] tracking-tight text-white">From first contact<br/>to what comes next.</h2><p className="mt-5 max-w-sm text-sm leading-7 text-white/55">Your relationships, opportunities, and projects. Built to move together.</p></div></section></main>;
 }

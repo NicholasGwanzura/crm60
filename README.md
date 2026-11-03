@@ -43,13 +43,13 @@ Then sign in at `/sign-in`. The admin can invite teammates from **Team** (email,
 
 ## Deployment status
 
-The application and a private PostgreSQL service are deployed in the Dokploy production environment at `https://spiritus.click`. Dokploy runs Prisma migrations and the idempotent organisation seed before starting Next.js. The database URL and Better Auth secret are runtime environment variables; no public database port is configured.
+The application and a private PostgreSQL service are deployed in the Dokploy production environment at `https://spiritus.click`. Dokploy runs Prisma migrations and the idempotent organisation seed before starting Next.js. The database URL and Better Auth secret are runtime environment variables; an external database port is managed separately in Dokploy.
 
 **Automatic deployment is off** — pushing to the repository does not rebuild the app. To release a change, trigger a manual **Deploy** in the Dokploy dashboard (or enable auto-deploy for the application).
 
 The live health check is `https://spiritus.click/api/health`. Configure database backups in Dokploy before storing durable business data.
 
-Remaining gaps before full production use: email delivery for invitations (links are currently shared manually), email verification, rate limiting, audit logs, secure document storage, and integration tests. Do not enter real customer data until those controls are implemented and reviewed.
+Remaining gaps before full production use: email delivery for invitations (links are currently shared manually), email verification, rate limiting, a comprehensive audit log and secure document storage. Do not enter real customer data until those controls are implemented and reviewed.
 
 ## DeepSeek AI
 
@@ -60,3 +60,20 @@ Keys entered in Settings are encrypted with AES-256-GCM using a key derived from
 On a lead detail page, **Generate summary** sends the authorized lead's title, company, stage, description (up to 6,000 characters) and three recent notes (up to 2,000 characters each) to DeepSeek. Contact email/phone are not included as separate fields; free text may contain personal information. Requests are explicit, limited to one per user per 30 seconds, and do not change CRM records. API charges use your DeepSeek account. Review AI suggestions before acting.
 
 The deployment runs the additive AI configuration/rate-limit migration automatically. Reference: https://api-docs.deepseek.com/.
+
+
+## Workspace workflows
+
+- **Overview**: pipeline values, stage age, win rate, overdue tasks, and a three-month forecast, separated by currency. Forecasting uses fixed stage probabilities and each lead's expected close date; it is an estimate, not booked revenue.
+- **Leads**: compact board with collapsible empty stages and grouped closed outcomes. Opening a lead from the workspace uses a side drawer; a direct URL opens the full detail page. Tabs separate overview, tasks, notes, activity, quotes, and AI. Save personal filter views; List view supports up to 100 selected leads for assignment or stage changes. All selected records must pass edit checks; stage changes require one organisation.
+- **Companies**: organisation-scoped company profiles, multiple contacts, linked leads and conversation history. The migration links existing lead company names to new profiles without discarding original values. Company/contact editing requires an active non-viewer role.
+- **My work**: personal daily tasks and lead follow-ups, Today / Open / Overdue / Upcoming / Completed views, due dates in Harare time, completion and re-opening. Overdue reminders are in-app; no email or push scheduler is included. Personal tasks are only visible to their assignee.
+- **Quotes**: exact decimal line calculations, tax, draft editing, internal approval, print / Save as PDF via the browser, and one-time conversion into a project. Approvals require a platform admin, organisation admin, or sales manager. Submitting for approval does not email the quote. Conversion associates the lead with the new project; the confirmation explains that this replaces a previous association.
+- **Issues**: project-linked issue reporting, assignments, priority, Open / In progress / Resolved workflow, mandatory resolution notes, activity history and time logs.
+- **Timers**: server-persisted start/stop entries for tasks and issues. Only one timer may run per person; completion/resolution stops related active timers. The active timer is available in the header. Timers continue while the browser is closed until stopped or the work is completed.
+
+The UI retains square corners, HONOR Sans, reduced-motion support, and accessible modal forms. The split-screen sign-in uses an AI-generated technology image bundled in `public/images/workspace-tech.webp`.
+
+## Verification
+
+`npm test` runs focused tests for encryption, access guards, filter behaviour and quote arithmetic. `tests/workflows.integration.test.ts` is opt-in: set `CRM_INTEGRATION=1` and a `DATABASE_URL` pointing to a disposable PostgreSQL database whose name starts with `crm60_verify_`, after applying migrations. It exercises real company/contact, lead, task, timer, quote approval/conversion, issue resolution, saved-view and bulk-action workflows. Never point this integration suite at the production database.
