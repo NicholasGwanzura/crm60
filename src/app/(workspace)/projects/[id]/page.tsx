@@ -4,19 +4,36 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditProject, canEditLeadRecord, accessProfile, leadScope, projectScope } from "@/lib/permissions";
+import { canEditProject, canWriteOrganisation, canEditLeadRecord, accessProfile, leadScope, projectScope } from "@/lib/permissions";
 import { LeadPipeline, type PipelineBoard } from "@/components/lead-pipeline";
 import { DeleteProjectButton } from "@/components/delete-project-button";
 import { assignLeadToProject, updateProject, updateProjectStatus } from "../actions";
 import { PROJECT_STATUSES, STATUS_LABELS, STATUS_STYLES, type ProjectStatus } from "@/lib/project-status";
 
-const EDITABLE_ROLES = new Set(["PLATFORM_ADMIN", "ORG_ADMIN", "SALES_MANAGER"]);
+import { ProjectWorkItems } from "@/components/project-work-items";
+import { IssueForm } from "@/components/issue-form";
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
   const user = await requireUser(); const { id } = await params;
   const project = await db.project.findFirst({ where: { AND: [{ id }, await projectScope(user.id)] }, include: { organisation: { include: { stages: { orderBy: { position: "asc" } } } }, owner: true, leads: { where: await leadScope(user.id), include: { stage: true, owner: { select: { name: true } } }, orderBy: { updatedAt: "desc" } } } });
   if (!project) notFound();
 
+  const view = (await searchParams).view === "board" ? "board" : "list";
+  const writable = await canWriteOrganisation(user.id, project.organisationId);
+  const [issues, memberships] = await Promise.all([
+    db.issue.findMany({
+      where: { projectId: id },
+      select: { id: true, title: true, status: true, priority: true, assignee: { select: { name: true } } },
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+    }),
+    writable ? db.organisationMembership.findMany({
+      where: { organisationId: project.organisationId, role: { not: "VIEWER" }, user: { suspended: false } },
+      select: { organisationId: true, userId: true, user: { select: { name: true } } },
+      orderBy: { user: { name: "asc" } },
+    }) : [],
+  ]);
+  const members = memberships.map(({ organisationId, userId, user }) => ({ organisationId, userId, name: user.name }));
+  const issueProject = { id, name: project.name, organisationId: project.organisationId };
   const profile=await accessProfile(user.id);
   const editable = await canEditProject(user.id, id);
 
@@ -38,19 +55,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     <nav className="text-sm text-neutral-500"><Link className="text-violet-700 hover:underline" href="/projects">Projects</Link> <span className="text-neutral-300">/</span> <span className="text-neutral-700">{project.name}</span></nav>
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex items-start gap-4">
-        <span className="grid size-14 place-items-center rounded-xl bg-violet-50 text-2xl">{project.emoji || project.name.slice(0, 1).toUpperCase()}</span>
+        <span className="grid size-14 place-items-center bg-violet-50 text-2xl">{project.emoji || project.name.slice(0, 1).toUpperCase()}</span>
         <div>
-          <div className="flex items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}>{STATUS_LABELS[status]}</span></div>
+          <div className="flex items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1><span className={`px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}>{STATUS_LABELS[status]}</span></div>
           <p className="mt-1 max-w-2xl text-sm text-neutral-500">{project.description || "No description yet."}</p>
           <p className="mt-2 text-xs text-neutral-400">{project.organisation.name} · owned by {project.owner.name}</p>
         </div>
       </div>
-      <Link href={`/issues?project=${id}`} className="ui-button-secondary">Project issues ↗</Link>
+      {writable && <IssueForm projects={[issueProject]} members={members} projectCreate={{ status: "OPEN" }} />}
     </header>
 
     <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-      <div className="min-w-0">
-        <LeadPipeline boards={[board]} />
+      <div className="min-w-0 space-y-6">
+        <ProjectWorkItems project={issueProject} issues={issues} members={members} view={view} writable={writable} />
+        <section aria-label="Linked lead pipeline">
+          <h2 className="mb-3 text-sm font-semibold">Linked lead pipeline</h2>
+          <LeadPipeline boards={[board]} />
+        </section>
       </div>
 
       <aside className="space-y-6">
