@@ -4,16 +4,16 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditLead, leadScope } from "@/lib/permissions";
+import { canEditLead, canWriteOrganisation, leadScope } from "@/lib/permissions";
 
 const leadInput = z.object({ title: z.string().trim().min(2).max(160), companyName: z.string().trim().min(2).max(160), email: z.union([z.email(), z.literal("")]), organisationId: z.uuid(), stageId: z.uuid(), description: z.string().max(5000) });
 
 export async function createLead(form: FormData) {
   const user = await requireUser();
   const input = leadInput.parse(Object.fromEntries(form));
-  const member = await db.organisationMembership.findFirst({ where: { userId: user.id, organisationId: input.organisationId, role: { not: "VIEWER" } } });
+  const canWrite = await canWriteOrganisation(user.id, input.organisationId);
   const stage = await db.leadStage.findFirst({ where: { id: input.stageId, organisationId: input.organisationId } });
-  if (!member || !stage) throw new Error("Not authorised");
+  if (!canWrite || !stage) throw new Error("Not authorised");
   const companyId=form.get("companyId")?z.uuid().parse(form.get("companyId")):null;
   const company=companyId?await db.company.findFirst({where:{id:companyId,organisationId:input.organisationId}}):null;
   if(companyId&&!company)throw new Error("Invalid company");
